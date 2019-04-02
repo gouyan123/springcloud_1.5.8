@@ -1,0 +1,44 @@
+info:
+  name: 配置中心
+  contact: 动脑VIP
+
+server:
+  port: 8888
+# 使得/refresh不需要验权
+management:
+  security:
+    enabled: false
+# 访问时需要提供用户和密码
+security:
+  # 这个接口不做用户名密码校验, /monitor接收git刷新通知
+  ignored: /monitor
+  user:
+    name: user
+    password: 12345678
+encrypt:
+  # 加解密用的秘钥
+  key: 12345678
+
+# rabbitmq的地址 用户名 密码
+spring:
+  rabbitmq:
+    host: 192.168.99.100
+    username: guest
+    password: guest
+  profiles:
+    active: dev
+
+# 不同环境的配置
+---
+spring:
+  profiles: dev
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://127.0.0.1:8761/eureka/
+  instance:
+    preferIpAddress: true
+
+  

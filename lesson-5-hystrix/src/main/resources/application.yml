@@ -1,0 +1,113 @@
+server:
+  port: 8081
+
+# 配置eureka
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://127.0.0.1:8761/eureka/
+
+spring:
+  cloud:
+    loadbalancer:
+      # 开启重试
+      retry:
+        enabled: true
+
+# 开启熔断机制
+feign:
+  hystrix:
+    enabled: true
+
+ribbon:
+  # 开启eureka与ribbon的集成
+  eureka:
+    enabled: true
+  # 开启熔断机制
+  hystrix: 
+    enabled: true
+  # 配置ribbon默认的超时时间
+  ConnectTimeout: 5000
+  ReadTimeout: 5000
+  # 是否开启重试
+  OkToRetryOnAllOperations: true
+  # 重试期间，实例切换次数
+  MaxAutoRetriesNextServer: 0
+  # 当前实例重试次数
+  MaxAutoRetries: 0
+  
+
+########hystrx相关配置.
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 3000
+
+
+
+
+
+#hystrix:
+#  threadpool:
+#    # 指定服务的配置
+#    lesson-5-sms-interface:
+#      coreSize: 1
+#      maxQueueSize: 200
+#      queueSizeRejectionThreshold: 3
+#    # 下面是默认的配置，暂时不用关心
+#    default:
+#      coreSize: 1
+#      maxQueueSize: 200
+#      queueSizeRejectionThreshold: 2
+#  command:
+#    # 指定feign客户端中具体的方法(基本上不会单独去配置)
+#    FeignSmsClient#timeout():
+#      execution:
+#        isolation:
+#          strategy: SEMAPHORE
+#          thread:
+#            timeoutInMilliseconds: 2000
+#          # 信号量模式下并发量，线程池模式下这个参数无用
+#          semaphore:
+#            maxConcurrentRequests: 2
+#    # 这是默认的配置
+#    default:
+#      execution:
+#        timeout:
+#          enabled: true
+#        isolation:
+#          strategy: THREAD
+#          thread:
+#            timeoutInMilliseconds: 1000
+#            interruptOnTimeout: true
+#            interruptOnFutureCancel: false
+#          semaphore:
+#            maxConcurrentRequests: 2
+#      fallback:
+#        enabled: true
+#        isolation:
+#          semaphore:
+#            maxConcurrentRequests: 10
+#      circuitBreaker:
+#        enabled: true
+#        forceOpen: false
+#        forceClosed: false
+#        requestVolumeThreshold: 3
+#        errorThresholdPercentage: 50
+#        sleepWindowInMilliseconds: 10000
+#      metrics:
+#        rollingStats:
+#          timeInMilliseconds: 5000
+#          numBuckets: 10
+#        rollingPercentile:
+#          enabled: true
+#          timeInMilliseconds: 60000
+#          numBuckets: 6
+#          bucketSize: 100
+#        healthSnapshot:
+#          intervalInMilliseconds: 500

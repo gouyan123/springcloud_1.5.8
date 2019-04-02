@@ -1,0 +1,48 @@
+-----------------------
+springboot整合mybatis依赖包如下：
+<dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+    <version>1.1.1</version>
+</dependency>
+ <dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+</dependency>
+-----------------------
+application.properties配置如下：
+# 配置 mysql数据源 datasource的driverClassName url username password；
+spring.datasource.driverClassName = com.mysql.jdbc.Driver
+spring.datasource.url = jdbc:mysql://localhost:3306/test1?useUnicode=true&characterEncoding=utf-8
+spring.datasource.username = root
+spring.datasource.password = root
+# 配置 mybatis的主配置文件mybatis-config.xml和mapper.xml映射文件，内容见文件；
+mybatis.config-locations=classpath:mybatis/mybatis-config.xml
+mybatis.mapper-locations=classpath:mybatis/mapper/*.xml
+-----------------------
+启动类 使用 @MapperScan("dao层UserMapper接口所在包")注解，扫描dao层 *Mapper接口：
+@SpringBootApplication
+@ComponentScan("com.dongnaoedu")
+/**没有启动 config客户端的注解*/
+@EnableEurekaClient
+@MapperScan("com.dongnaoedu.springcloud.service.mybatis.dao1")
+public class SmsServiceApplication {
+	public static void main(String[] args) {
+		new SpringApplicationBuilder(SmsServiceApplication.class).web(true).run(args);
+	}
+}
+-----------------------
+定义dao层 UserMapper接口，里面定义crud方法，代码如下：
+@Repository
+public interface UserMapper
+    List<UserEntity> getAll();
+    UserEntity getOne(Long id);
+    void insert(UserEntity user);
+    void update(UserEntity user);
+    void delete(Long id);
+}
+其对应 UserMapper.xml文件在 resources/mybatis/mapper目录中，entity类为 UserEntity，controller层类为
+UserController，接口为 http://localhost:9002/user/save?userName=James&passWord=123；
+-----------------------
+
+

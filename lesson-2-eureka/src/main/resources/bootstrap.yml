@@ -1,0 +1,6 @@
+# 比application context先加载
+# 应用名称
+spring:
+  application:
+    name: eureka-server
+

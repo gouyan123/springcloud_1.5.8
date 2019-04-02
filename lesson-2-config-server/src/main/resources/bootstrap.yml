@@ -1,0 +1,44 @@
+spring:
+  application:
+    # config服务端 配置文件 以该名称命名，注意对应。
+    name: lesson-2-config-server
+  profiles:
+    active: dev,git       #激活 2个环境 dev和git
+  cloud:
+    config:
+      server:
+        # config服务端 把 配置文件 存在本地
+        native:
+          # 用本地文件夹存储配置，仅作配置示例，没起作用。要想起作用，将上面的 active中git 改为 native
+          searchLocations: file:D:\\configrepo
+        # config服务端 把 配置文件 存在github
+        git:
+          # 记得在先gitlab上创建一个对应的project，此处为SpringCloudConfig
+          uri: https://github.com/gouyan123/SpringCloudConfig
+          search-paths: /respo
+          username: gouyan123
+          password: ab216411
+          # 不同环境不同的库
+#          repos:
+#            # 这里的话，只有当应用中的spring.profiles.active=staging的时候才生效
+#            lesson-2-sms-sys-staging:
+#              pattern: '*/staging'        #staging环境，给用户演示的环境
+#              uri: http://192.168.99.100:18080/root/lesson-2-config-repo-staging.git
+#            # 不同项目不同库
+#            lesson-2-sms-webmvc:
+#              pattern:
+#                # 这里是根据服务名称匹配的spring.application.name
+#                - lesson-2-sms-webmvc/**
+#                - lesson-2-sms-webmvc*
+#              # 这里面的是本地git仓库的，不知道配置本地git仓库的也可以像上面一样配置成远程git地址
+#              uri: file:E:\动脑学院\应用框架（专题一）\016-应用框架-springcloud（config分布式配置中心）-20170905-tony\程序\config-repo
+#        # 加解密
+#        encrypt:
+#          enabled: false
+
+
+# svn环境  
+# spring.profiles.active=subversion
+# spring.cloud.config.server.svn.uri=http:#127.0.0.1:1234/sms-sys/development/trunk
+# spring.cloud.config.server.svn.username=xxx
+# spring.cloud.config.server.svn.password=xxx

@@ -1,0 +1,29 @@
+server:
+  port: 8761
+
+# 配置eureka
+eureka:
+  instance:
+    ######################### 续约 心跳 下线 #########################
+    # Eureka服务器在接收到实例最后一次发出的心跳后，需要等待多久才可以将此实例删除，默认为90s
+    lease-expiration-duration-in-seconds: 30
+  client:
+    registerWithEureka: true
+#    serviceUrl:
+#      defaultZone: http://127.0.0.1:8761/eureka/
+    ######################### 续约 心跳 下线 #########################
+    # Eureka Server端服务实例租约过期定时任务执行频率，默认60s
+    eviction-interval-timer-in-ms: 30
+    # 该实例是否从 Eureka 服务器获取所有的注册信息；暂时设置为 false，否则报错
+    fetchRegistry: false
+    # 从 Eureka-Server 拉取注册服务实例信息频率，默认：30 秒
+    # registry-fetch-interval-seconds: 30
+    # 是否禁用增量获取服务实例注册信息
+  server:
+    ######################### 缓存         #########################
+    # 是否开启只读请求响应缓存，响应缓存 ( ResponseCache ) 机制目前使用两层缓存策略：优先读取只读缓存，读取不到后读取读写缓存；
+    use-read-only-response-cache: false
+    # 从eureka集群 其他peer获取 服务实例信息时，如果获取不到，等多久
+    waitTimeInMsWhenSyncEmpty: 0
+    # eureka集群 peer之间，同步数据时间间隔
+    peerEurekaStatusRefreshTimeIntervalMs: 30000

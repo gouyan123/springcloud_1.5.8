@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+# 配置eureka
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://127.0.0.1:8761/eureka/
+
+spring:
+  cloud:
+    loadbalancer:
+      # 开启重试
+      retry:
+        enabled: true
+
+# 关闭熔断机制
+feign:
+  hystrix:
+    enabled: false
+# 第 3 种配置形式：eureka
+ribbon:
+  # 开启eureka与ribbon的集成
+  eureka:
+    enabled: true
+  # 暂不开启熔断机制
+  hystrix: 
+    enabled: false
+  # 配置ribbon默认的超时时间
+  ConnectTimeout: 2000
+  ReadTimeout: 2000
+  # 是否开启重试
+  OkToRetryOnAllOperations: true
+  # 重试期间，实例切换次数	 比如：100个实例，我只会在四个实例上面去重试
+  MaxAutoRetriesNextServer: 3
+  # 当前实例重试次数
+  MaxAutoRetries: 2
+
+# 第 1 种配置形式：服务名 实例列表
+# 定义一个针对service-by-properties服务的负载均衡器。服务实例信息来自配置文件
+# 服务名
+service-by-properties:     # 请求 service-by-properties服务时，从下面服务列表找
+  # 服务实例列表
+  listOfServers: http://www.csdn.net,http://www.baidu.com,http://www.dongnaoedu.com
+  # 这个负载均衡器不做重试
+  MaxAutoRetriesNextServer: 0
+  MaxAutoRetries: 0
+  ribbon:
+    # 负载策略
+    NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RoundRobinRule
+    # 设置它的服务实例信息来自配置文件, 如果不设置NIWSServerListClassName就会去euereka里面找
+    NIWSServerListClassName: com.netflix.loadbalancer.ConfigurationBasedServerList

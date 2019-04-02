@@ -1,0 +1,148 @@
+jpa代码环境：
+lesson-1-sms-interface项目中创建 jpa包 com.dongnaoedu.springcloud.data.jpa
+-----------------------------------------------------------------------------------------------------
+bootstrap.yml文件中配置 mysql数据源及 jpa，如下：
+spring:
+  application:
+    name: lesson-1-sms-interface
+  datasource:
+      driver-class-name: com.mysql.jdbc.Driver
+      url: jdbc:mysql://127.0.0.1:3306/test?useUnicode=true&characterEncoding=utf8&characterSetResults=utf8
+      username: root
+      password: 123456
+  jpa:
+      hibernate:
+        ddl-auto: update  # 不要用create，会删除表；都使用update，第一次会创建表，以后更新表
+        show-sql: true
+  data:
+      rest:
+        base-path: /api  # 此时REST资源的路径变成了http://localhost:9002/api/workers
+  thymeleaf:
+    cache: false    # 关闭页面缓存，修改文件后，直接刷新，不需重启
+------------------------
+pom.xml文件 jpa依赖包如下：
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.hsqldb</groupId>
+    <artifactId>hsqldb</artifactId>
+    <scope>runtime</scope>
+</dependency>
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+    <scope>runtime</scope>
+</dependency>
+------------------------
+..data.jpa.domain包中创建 Person类，如下 @Entity表示该类为Entity类，@Table表示映射的数据表，@Id表示映射
+主键，@GeneratedValue表示主键为自增类型，jpa.hibernate.ddl-auto.update表示根据 表名，属性名，自动创建
+数据表：
+@Entity
+@Table(name = "t_person")
+public class Person {
+	@Id
+	@GeneratedValue
+	private Long id;
+	private String name;
+	private Integer age;
+	private String address;
+	setter，getter省略
+}
+------------------------
+..data.jpa.dao包中创建 PersonRepository类，进行数据持久化，如下：
+@Repository
+public interface PersonRepository extends JpaRepository<Person, Long> {
+
+}
+PersonRepository 接口中方法分为 3类：
+1 继承JpaRepository接口的 save()方法，findAll()方法，controller层中直接调用即可，例personRepository.save();
+2 接口方法上定义 @Query注解，自定义接口方法的JPQL语句；
+3 Spring规定的接口命名方法自动创建CRUD操作，Spring Data JPA命名规则表如下：
+Keyword 	    Sample	                                JPQL snippet
+And	            findByLastnameAndFirstname	            … where x.lastname = ?1 and x.firstname = ?2
+Or	            findByLastnameOrFirstname	            … where x.lastname = ?1 or x.firstname = ?2
+Is,Equals	    findByFirstname,findByFirstnameIs,findByFirstnameEquals	… where x.firstname = ?1
+Between	        findByStartDateBetween	                … where x.startDate between ?1 and ?2
+LessThan	    findByAgeLessThan	                    … where x.age < ?1
+LessThanEqual   findByAgeLessThanEqual	            … where x.age <= ?1
+GreaterThan	    findByAgeGreaterThan	                … where x.age > ?1
+GreaterThanEqual findByAgeGreaterThanEqual	        … where x.age >= ?1
+After	        findByStartDateAfter	                … where x.startDate > ?1
+Before	        findByStartDateBefore	                … where x.startDate < ?1
+IsNull	        findByAgeIsNull	… where x.age is null
+IsNotNull,NotNull findByAge(Is)NotNull	            … where x.age not null
+Like	        findByFirstnameLike	                    … where x.firstname like ?1
+NotLike	        findByFirstnameNotLike	… where x.firstname not like ?1
+StartingWith    findByFirstnameStartingWith	        … where x.firstname like ?1 (parameter bound with appended %)
+EndingWith	    findByFirstnameEndingWith	            … where x.firstname like ?1 (parameter bound with prepended %)
+Containing	    findByFirstnameContaining	            … where x.firstname like ?1 (parameter bound wrapped in %)
+OrderBy	        findByAgeOrderByLastnameDesc	        … where x.age = ?1 order by x.lastname desc
+Not	            findByLastnameNot	… where x.lastname <> ?1
+In	            findByAgeIn(Collection<Age> ages)	    … where x.age in ?1
+NotIn	        findByAgeNotIn(Collection<Age> age) 	… where x.age not in ?1
+TRUE	        findByActiveTrue()	                    … where x.active = true
+FALSE	        findByActiveFalse()	                    … where x.active = false
+IgnoreCase	    findByFirstnameIgnoreCase	            … where UPPER(x.firstame) = UPPER(?1)
+------------------------
+..jpa.controller包中创建 PersonController类，如下：
+@RestController
+public class PersonController {
+    @Autowired
+    private PersonRepository personRepository;
+}
+------------------------
+PersonController类中创建 save()方法，save()为JpaRepository接口中方法，如下：
+public class PersonController {
+    @Autowired
+    private PersonRepository personRepository;
+
+    @RequestMapping(value = "/save",method = RequestMethod.GET)
+    public Person save(String name, String address, Integer age){
+        Person person = personRepository.save(new Person(null,name,age,address));
+        return person;
+    }
+}
+发送get请求：http://localhost:9002/save?name=Kobe&age=36&address=USA，
+页面返回：{"id":3,"name":"Kobe","age":36,"address":"USA"}，数据库中已成功添加该数据；
+------------------------
+PersonController类中创建 findByName()方法，该方法为 使用方法名查询，不是JpaRepository接口方法，因此需要
+在PersonRepository接口中定义该方法，扩展父接口JpaRepository，具体如下：
+public class PersonController {
+    @Autowired
+    private PersonRepository personRepository;
+
+    @RequestMapping(value = "/findByNameAndAddress",method = RequestMethod.GET)
+    public List<Person> findByNameAndAddress(String name,String address){
+        List<Person> persons = personRepository.findByNameAndAddress(name,address);
+        return persons;
+    }
+}
+
+@Repository
+public interface PersonRepository extends JpaRepository<Person, Long> {
+    /**使用方法名查询，接收参数，返回一个列表*/
+    List<Person> findByNameAndAddress(String name,String address);
+}
+发送get请求：http://localhost:9002/findByNameAndAddress?name=Kobe&address=USA，
+页面返回：{"id":3,"name":"Kobe","age":36,"address":"USA"}
+------------------------
+PersonRepository类中定义 updateAgeByName()方法，searchJoin()方法，这 2个方法使用 @Query注解；@Query中
+可以使用JPQL语句，也可以使用原生sql语句，代码如下：
+@Repository
+public interface PersonRepository extends JpaRepository<Person, Long> {
+
+    /**@Modifying表示更新，@Transactional表示修改数据表时开启事务；*/
+    @Modifying
+    @Transactional(readOnly = false)
+    /**JPSL可移植性，换什么数据库都可以*/
+    @Query("update Person p set p.age=:age where name=:name")
+    int updateAgeByName(@Param("name") String name,@Param("age") int age);
+
+    /**nativeQuery = true表示使用原生sql语句*/
+    @Query(nativeQuery = true,value = "select p.name,t.team_name from person p left join team t on p.team_id=t.id")
+    List<Object[]> searchJoin();
+}
+
+

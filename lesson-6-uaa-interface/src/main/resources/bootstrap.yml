@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: lesson-6-uaa-interface
+  cloud:
+    config:
+      discovery:
+        # 使用eureka发现配置中心服务
+        enabled: true
+        # 配置中心服务名称/ID
+        serviceId: lesson-6-config-server
+      # 登录用户名和密码
+      username: user
+      password: 12345678
+      # 覆盖本地配置
+      overrideNone: false
+      failFast: true

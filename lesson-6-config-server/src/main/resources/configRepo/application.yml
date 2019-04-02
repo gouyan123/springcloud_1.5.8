@@ -1,0 +1,8 @@
+# 这种application的配置文件，可以作为公共的配置存储
+
+# jwt相关的配置
+token:
+  jwt:
+    key: a123456789
+    iss: lesson-6-uaa-interface
+    expm: 120

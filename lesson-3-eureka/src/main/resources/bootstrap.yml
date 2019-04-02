@@ -1,0 +1,5 @@
+# 比application先加载
+spring:
+  application:
+    name: eurekaserver
+

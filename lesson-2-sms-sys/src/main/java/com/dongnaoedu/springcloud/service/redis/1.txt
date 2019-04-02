@@ -1,0 +1,8 @@
+/**@ConfigurationProperties 使用方式有两种：
+ * 1、在类上使用该注解：接收 application.yml中 spring.mongodb下面的值，存到该类的成员变量中，成员变量必须有 setter，getter方法
+ * 2、在工厂方法上使用该注解，代码如下
+ *     @ConfigurationProperties(prefix = "spring.datasource.sakila")
+ *     public DataSource dataSource() {
+ *         return DataSourceBuilder.create().build();
+ *     }
+ * */

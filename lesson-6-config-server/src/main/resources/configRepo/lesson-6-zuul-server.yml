@@ -1,0 +1,114 @@
+server:
+  port: 8765
+
+management:
+  security:
+    enabled: false
+####################这里开始进入 Zuul配置###################################
+zuul:
+  # 代理普通http请求的超时时间
+  host:
+    socket-timeout-millis: 2000
+    connect-timeout-millis: 1000
+    # http连接池大小
+    maxTotalConnections: 200
+    # 每个host最大连接数
+    maxPerRouteConnections: 20
+
+  # 路径前面加一个前缀 /tony_api
+  prefix: /tony_api
+  # 不代理某些服务，有些服务不对外公布，就可以在这里忽略掉
+  # 比如sms-interface，我们不对外开放，可以在这里忽略掉，不然zuul从eureka获取到后就可以进行代理
+  ignored-services: 
+  # hystrix 隔离策略，默认信号量(因为zuul中大量用到线程变量)。优先级要高过在hystrix中配置；
+  ribbonIsolationStrategy: SEMAPHORE 
+  semaphore:
+    # 信号量模式下，最大并发量。优先级要高过在hystrix中配置；
+    maxSemaphores: 100
+
+####################这里开始是路由配置################################### 
+# 通过配置文件配置的静态路由
+  routes:
+    # 路由Id为route1，这个路由是一个指定实例的，没有用到ribbon，就是发起一个普通的http请求；路由名称 route1随便起；
+    route1:
+      # 定义匹配哪个路径。ant风格的路径表达式
+      path: /oschina/**
+      # url就是实例地址
+      url: http://www.baidu.com
+    # 创建一个路由，指向我们自定义ribbon负载均衡器中的服务
+    route2:
+      path: /gy/**
+      url: https://so.csdn.net/so/search/s.do?q=springboot%E6%BA%90%E7%A0%81
+    route-service-by-ribbon: 
+      # 指定这个路径会匹配到这个路由。
+      path: /service-by-ribbon/**
+      # 这里表示，这个路由的实例信息，是通过ribbon负载均衡器进行获取的。值就是对应服务名
+      serviceId: service-by-ribbon
+
+    # 指定了一个路由，Id为uaa-token，在做验权的时候需要用到
+    uaa-token:
+      # 指定这个路径会匹配到这个路由。
+      path: /token/byPhone
+      # 这里表示，这个路由的实例信息，是通过ribbon负载均衡器进行获取的。值就是对应服务名
+      serviceId: lesson-6-uaa-interface
+####################结束路由配置################################### 
+
+####################这里开始是filter相关配置################################### 
+  # 禁用springcloud自带的errorfilter
+  SendErrorFilter:
+    error:
+      disable: true
+  # 禁用自定义的token校验filter  
+  TokenValidataFilter:
+    pre:
+      disable: true
+####################filter配置结束################################### 
+
+
+ribbon:
+  # 配置ribbon默认的超时时间
+  ConnectTimeout: 1000
+  ReadTimeout: 2000
+  # 是否开启重试
+  OkToRetryOnAllOperations: true
+  # 重试期间，实例切换次数
+  MaxAutoRetriesNextServer: 1
+  # 当前实例重试次数
+  MaxAutoRetries: 0
+# 定义一个针对service-by-ribbon服务的负载均衡器，服务实例信息来自配置文件,zuul默认可以集成
+# 服务名
+service-by-ribbon:
+  # 服务实例列表
+  listOfServers: http://www.csdn.net,http://www.baidu.com,http://www.dongnaoedu.com
+  ribbon:
+    # 负载策略
+    NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule
+    # 设置它的服务实例信息来自配置文件, 如果不设置NIWSServerListClassName就会去euereka里面找
+    NIWSServerListClassName: com.netflix.loadbalancer.ConfigurationBasedServerList
+
+
+########hystrix相关配置
+# 注意项：
+# 1、zuul环境下，信号量模式下并发量的大小，zuul.semaphore.maxSemaphores这种配置方式优先级最高
+# 2、zuul环境下，资源隔离策略默认信号量，zuul.ribbonIsolationStrategy这种配置方式优先级最高
+# 3、zuul环境下，commandGroup 固定为RibbonCommand
+# 4、zuul环境下，commandKey 对应每个服务的serviceId
+# 
+hystrix:
+  command:
+    # 这是默认的配置
+    default:
+      execution:
+        timeout:
+          enabled: true
+        isolation:
+          thread:
+            # 命令执行超时时间
+            timeoutInMilliseconds: 2000
+
+# 以下是自定义的配置，配置的值会被注入到TonyConfigurationBean这个类
+tony:
+  zuul:
+    tokenFilter:
+      noAuthenticationRoutes: 
+        - uaa-token     # - 表示集合

@@ -1,0 +1,68 @@
+1、利用springboot自动装配，将 spring-cloud-netflix-eureka-server.jar包装配到 springboot中：
+
+``````服务实例 注册过程
+找入口 - spring-cloud-starter-netflix-eureka-client:2.1.0.RELEASE - /META-INF/spring.factories - EurekaClientAutoConfiguration - EurekaClientConfiguration#eurekaClient(...)
+- new CloudEurekaClient(...) - 跟 super(applicationInfoManager, config, args) - this(applicationInfoManager, config, args, new Provider<BackupRegistry>(){...})
+- 初始化线程池 scheduler，heartbeatExecutor，cacheRefreshExecutor -
+scheduler：支持定时任务线程池；
+heartbeatExecutor：心跳检测线程池；
+cacheRefreshExecutor：缓存刷新线程池；
+- initScheduledTasks(启动所有定时任务) - 跟 - 分析注册流程怎么走的？- scheduler.schedule(...,new HeartbeatThread()) - 跟HeartbeatThread()
+- 跟 DiscoveryClient.HeartbeatThread#renew() - 跟 DiscoveryClient#register() 将 实例信息 InstanceInfo注册到 httpRespose集合中；
+
+``````End
+
+``````服务实例 怎么存储
+找入口 - spring-cloud-starter-netflix-eureka-server:2.1.0.RELEASE - /META-INF/spring.factories - EurekaServerAutoConfiguration - jerseyApplication(...)
+- 跟 for()作用：让eureka能调用 jerseyApplication的 API - EurekaServerAutoConfiguration#jerseyFilterRegistration() 注册jersey拦截器，拦截url中
+包含 /eureka的所有请求 - ApplicationResource#addInstance(...) 跟里面的registry.register(info, "true".equals(isReplication)) -
+    1、InstanceRegistry#register(...) - handleRegistration() - publishEvent()
+                                      - super.register(info, isReplication) - PeerAwareInstanceRegistryImpl#register(...) - AbstractInstanceRegistry#register(...) -
+    2、PeerAwareInstanceRegistryImpl#register(...)：
+``````End
+
+``````注册中心怎么实现高可用？
+eureka服务端 集群中 peer1 peer2 peer3，都是对等的，没有主从之分，采用AP模式：A有效性-200ms内肯定有返回，P-分区容错；
+找入口 - spring-cloud-starter-netflix-eureka-server:2.1.0.RELEASE - /META-INF/spring.factories - EurekaServerAutoConfiguration#eurekaServerContext(...,PeerEurekaNodes peerEurekaNodes)
+- new DefaultEurekaServerContext(...) - DefaultEurekaServerContext#initialize()，其中@PostConstruct表示在构造方法执行后，执行初始化方法
+- PeerEurekaNodes#start() - PeerEurekaNodes#updatePeerEurekaNodes()里面维护 2个Set，toShutdown：要删除的实例集合，toAdd：要增加的实例集合，例如：peer1通过url调用peer2 peer3，将增加的实例发过去 实现高可用
+``````End
+
+``````注册中心怎么同步数据？怎么防止循环传播？
+PeerAwareInstanceRegistryImpl#register(...) - PeerAwareInstanceRegistryImpl#replicateToPeers(...,isReplication)将实例信息复制给 peer，isReplication表示是否新增实例，避免循环传播
+- PeerAwareInstanceRegistryImpl#replicateInstanceActionsToPeers() 把实例信息注册到 其他peer - PeerEurekaNode#register()
+``````End
+
+``````eureka客户端关闭，注册中心怎么剔除实例信息？
+DiscoveryClient#shutdown() - DiscoveryClient#cancelScheduledTasks() 取消定时任务 即关闭线程池
+                           - DiscoveryClient#unregister()
+``````End
+
+``````注册中心剔除异常实例信息，什么情况下实例信息不会被剔除？
+EurekaServerInitializerConfiguration#start() - EurekaServerBootstrap#contextInitialized() - EurekaServerBootstrap#initEurekaEnvironment()
+                                                                                          - EurekaServerBootstrap#initEurekaServerContext() - PeerAwareInstanceRegistry#openForTraffic()
+- InstanceRegistry#openForTraffic() - PeerAwareInstanceRegistryImpl#openForTraffic() - AbstractInstanceRegistry#updateRenewsPerMinThreshold()
+- 该方法给出公式如下：
+this.numberOfRenewsPerMinThreshold = (int) (this.expectedNumberOfClientsSendingRenews
+                * (60.0 / serverConfig.getExpectedClientRenewalIntervalSeconds()) 一分钟发送心跳次数
+                * serverConfig.getRenewalPercentThreshold()) ，其中参数如下：
+numberOfRenewsPerMinThreshold：每分钟接收到心跳数量阈值；
+expectedNumberOfClientsSendingRenews：预期的正在发送心跳的 实例个数；
+expectedClientRenewalIntervalSeconds：实例发送心跳 的时间间隔；
+renewalPercentThreshold：eureka服务端 一分钟之内接收到的 心跳数量 < 阈值时，会开启自我保护模式，直接 退出 AbstractInstanceRegistry#evict()，不会剔除实例
+- PeerAwareInstanceRegistryImpl#openForTraffic() - applicationInfoManager.setInstanceStatus(InstanceStatus.UP)
+                                                 - super.postInit() - evictionTaskRef.set(new EvictionTask()) - EvictionTask#run()
+- evict(compensationTimeMs) - if (!isLeaseExpirationEnabled()) - PeerAwareInstanceRegistryImpl#isLeaseExpirationEnabled() -
+isSelfPreservationModeEnabled() - 自我保护模式关闭 - 返回true
+                                - 自我保护模式开启 - numberOfRenewsPerMinThreshold > 0 && getNumOfRenewsInLastMin() > numberOfRenewsPerMinThreshold;
+``````End
+
+``````注册中心 开启 自我保护模式，关闭实例无法剔除，调用到无效实例怎么办？
+eureka服务端 开启自我保护机制后，eureka客户端关闭后，不会从注册表中消失，默认情况下，自我保护模式开启，通过熔断机制，当该服务一直不能使用时，会被熔断；
+``````End
+
+
+
+
+
+

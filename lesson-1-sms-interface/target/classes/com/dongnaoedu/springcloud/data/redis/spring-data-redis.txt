@@ -1,0 +1,128 @@
+------------------------------SpringBoot整合单机版redis-----------------------------------------------------------------------------------
+本文中，SpringBoot整合Redis，使用的是RedisTemplate，分别实现了SpringBoot与redis的单机版、集群版、哨兵模式的整合；
+------------------------
+springboot的redis依赖包
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+------------------------
+springboot的redis配置文件 bootstarp.yml，内容如下：
+spring:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    timeout: 10000     #客户端 10s内未连接成功，则连接失败
+    pool:
+      max-active: 8
+      min-idle: 0
+      max-idle: 8
+      max-wait: -1
+#    cluster:          #集群配置
+#      nodes: 47.100.49.95:6379,101.132.109.12:6379,39.106.185.193:6379
+#      max-redirects: 3
+#    sentinel:         #哨兵配置
+#      master:
+#      nodes:
+------------------------
+redis.config包中创建 RedisConfig类，向spring容器中注入 redisTemplate实例：
+@Configuration
+public class RedisConfig {
+
+    private Integer maxIdle;
+    @Value("${spring.redis.pool.max-idle}")
+    public void setMaxIdle(Integer maxIdle) {
+        this.maxIdle = maxIdle;
+        System.out.println("----------------------------- maxIdle = " + maxIdle);
+    }
+
+    @Value("${spring.redis.pool.max-active}")
+    private Integer maxTotal;
+
+    @Value("${spring.redis.pool.max-wait}")
+    private Integer maxWaitMillis;
+
+    @Value("${spring.redis.pool.min-idle}")
+    private Integer minEvictableIdleTimeMillis;
+
+    /**JedisPoolConfig 连接池*/
+    @Bean
+    public JedisPoolConfig jedisPoolConfig() {
+        JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
+        // 最大空闲数
+        jedisPoolConfig.setMaxIdle(maxIdle);
+        // 连接池的最大数据库连接数
+        jedisPoolConfig.setMaxTotal(maxTotal);
+        // 最大建立连接等待时间
+        jedisPoolConfig.setMaxWaitMillis(maxWaitMillis);
+        // 逐出连接的最小空闲时间 默认1800000毫秒(30分钟)
+        jedisPoolConfig.setMinEvictableIdleTimeMillis(minEvictableIdleTimeMillis);
+        return jedisPoolConfig;
+    }
+    /**单机版配置*/
+    @Bean
+    public JedisConnectionFactory JedisConnectionFactory(JedisPoolConfig jedisPoolConfig){
+        JedisConnectionFactory JedisConnectionFactory = new JedisConnectionFactory(jedisPoolConfig);
+        //连接池
+        JedisConnectionFactory.setPoolConfig(jedisPoolConfig);
+        //IP地址
+        JedisConnectionFactory.setHostName("192.168.177.128");
+        //端口号
+        JedisConnectionFactory.setPort(6379);
+        //如果Redis设置有密码
+        //JedisConnectionFactory.setPassword(password);
+        //客户端超时时间单位是毫秒
+        JedisConnectionFactory.setTimeout(5000);
+        return JedisConnectionFactory;
+    }
+
+    /**实例化 RedisTemplate 对象*/
+    @Bean
+    public RedisTemplate<String, Object> functionDomainRedisTemplate(RedisConnectionFactory redisConnectionFactory) {
+        RedisTemplate<String, Object> redisTemplate = new RedisTemplate<String, Object>();
+        initDomainRedisTemplate(redisTemplate, redisConnectionFactory);
+        return redisTemplate;
+    }
+    /**设置数据存入 redis 的序列化方式,并开启事务*/
+    private void initDomainRedisTemplate(RedisTemplate<String, Object> redisTemplate, RedisConnectionFactory factory) {
+        //如果不配置Serializer，那么存储的时候缺省使用String，如果用User类型存储，那么会提示错误User can't cast to String！
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+        redisTemplate.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+        redisTemplate.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        // 开启事务
+        redisTemplate.setEnableTransactionSupport(true);
+        redisTemplate.setConnectionFactory(factory);
+    }
+    /**注入封装RedisTemplate*/
+    @Bean(name = "redisUtil")
+    public RedisUtil redisUtil(RedisTemplate<String, Object> redisTemplate) {
+        RedisUtil redisUtil = new RedisUtil();
+        redisUtil.setRedisTemplate(redisTemplate);
+        return redisUtil;
+    }
+}
+------------------------
+创建 RedisUtil类，封装 redisTemplate的所有操作
+public class RedisUtil {
+    private RedisTemplate<String, Object> redisTemplate;
+    public void setRedisTemplate(RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
+    //=============================common============================
+    /** 指定缓存失效时间*/
+    public boolean expire(String key,long time){
+        try {
+            if(time>0){
+                redisTemplate.expire(key, time, TimeUnit.SECONDS);
+            }
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    ...
+}
+------------------------
+test.com.dongnaoedu.springcloud.data.redis包中创建 TestRedisUtil测试类，测试RedisUtil类中封装的各个方法；

@@ -1,0 +1,10 @@
+info:
+  name: 用户中心
+  contact: 动脑学院VIP
+
+server:
+  port: 9004
+
+management:
+  security:
+    enabled: false

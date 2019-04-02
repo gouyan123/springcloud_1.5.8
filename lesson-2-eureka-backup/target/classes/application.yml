@@ -1,0 +1,28 @@
+# 上下文初始化加载
+info:
+  name: Eureka server
+  contact: 动脑科技VIP
+
+spring:
+  profiles:
+    active: dev
+---
+spring:
+  profiles: dev
+server:
+  port: 8762
+eureka:
+  client:
+    # 是否注册到eurekaserver
+    registerWithEureka: true
+    # 是否拉取信息
+    fetchRegistry: true
+    # eureka server地址
+    serviceUrl:
+      defaultZone: http://eureka1:8761/eureka/
+  server:
+    waitTimeInMsWhenSyncEmpty: 0
+    # false 关闭自我保护，不管如何都要剔除心跳检测异常的服务
+    enableSelfPreservation: false
+  instance:
+    hostname: eureka2

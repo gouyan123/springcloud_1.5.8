@@ -1,0 +1,28 @@
+spring:
+  profiles:
+    active: dev     #激活 dev环境
+# 没有配置 server.port，则默认为 8080
+---
+spring:
+  profiles: dev
+
+eureka:
+  client:
+    registerWithEureka: true        # 所有服务都要作为 eureka客户端 注册到 eureka服务端；
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: http://127.0.0.1:8761/eureka
+  instance:
+    preferIpAddress: true
+---
+spring:
+  profiles: prod
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      # 这里写成eureka1，是因为我修改系统的hosts， 127.0.0.1 eureka1
+      defaultZone: http://eureka1:8761/eureka
+  instance:
+    preferIpAddress: true

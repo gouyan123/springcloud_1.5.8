@@ -1,0 +1,56 @@
+info:
+  name: 配置中心
+  contact: 动脑VIP
+
+server:
+  port: 8888
+# spring-boot-starter-actuator 动态刷新配置需要验权；false表示 /refresh接口(post类型) 不需要验权
+management:
+  security:
+    enabled: false
+# 访问 config服务端 时需要提供用户和密码
+security:
+  # /monitor接口不做用户名密码校验, /monitor接收git刷新通知
+  ignored: /monitor
+  user:
+    name: user
+    password: 12345678
+# config服务端里面存的配置信息，有些可能需要加密，这里设置秘钥；
+#encrypt:
+  # 加解密用的秘钥
+  #key: 12345678
+
+# rabbitmq的地址 用户名 密码
+spring:
+  rabbitmq:
+    host: 47.100.49.95
+    username: gouyan
+    password: 123456
+  profiles:
+    active: dev
+
+# 不同环境的配置
+---
+spring:
+  profiles: dev
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+#      defaultZone: http://172.17.1.245:8010/eureka/,http://127.0.0.1:8761/eureka/
+      defaultZone: http://eureka2:8762/eureka/,http://eureka1:8761/eureka/
+  instance:
+    preferIpAddress: true
+---
+spring:
+  profiles: prod
+eureka:
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    service-url: http://eureka1:8761/eureka/,http://eureka2:8762/eureka/
+#      defaultZone: http://eureka1:8761/eureka/,http://eureka2:8762/eureka/,http://eureka3:8763/eureka/
+  instance:
+    preferIpAddress: true
+  

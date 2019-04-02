@@ -1,0 +1,16 @@
+spring:
+  application:
+    # 配置文件就是用这个来做文件名的，要对应的哦。
+    name: lesson-6-config-server
+  profiles:
+    active: dev,native
+  cloud:
+    config:
+      server:
+        # 本地文件
+        native:
+          # 用本地文件夹存储配置，在上面的 active中加入 native
+          searchLocations: classpath:configRepo/
+        # 加解密
+        encrypt:
+          enabled: true
