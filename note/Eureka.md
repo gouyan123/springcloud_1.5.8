@@ -38,6 +38,233 @@ org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
 spring.factories中这样定义目的：springboot启动时会 自动装配 以EnableAutoConfiguration为key的value，因此EurekaServerAutoConfiguration会被 实例化到当前IOC容器
 ```
 
+```text
+1、eureka服务端 接收 eureka客户端 注册请求 并存储 实例信息；
+2、eureka服务端 高可用；peer 2 peer模式，没有主从节点之分，各节点完全对等，无中心化，相互注册 同步信息，即 实例信息 注册到 eureka1时，eureka2/3都会同步这个实例信息；
+3、eureka服务端 服务剔除，默认90s内，没有收到 eureka客户端心跳；
+```
+```java
+/**1、eureka服务端 接收 eureka客户端 注册请求 并存储 实例信息；
+* eureka 服务端 受理注册请求，通过 restful接口接收，通过jersey框架实现 restful接口，接口规则 https://github.com/Netflix/eureka/wiki
+* 初始化过程，springcloud集成 eureka原生包中的 Jersey REST接口框架*/
+@Configuration
+public class EurekaServerAutoConfiguration extends WebMvcConfigurerAdapter {
+    @Bean
+    public javax.ws.rs.core.Application jerseyApplication(Environment environment, ResourceLoader resourceLoader) {
+        //...
+        for (String basePackage : EUREKA_PACKAGES) {    //EUREKA_PACKAGES = new String[] { "com.netflix.discovery","com.netflix.eureka" }; 扫描eureka下的包
+            Set<BeanDefinition> beans = provider.findCandidateComponents(basePackage);
+            for (BeanDefinition bd : beans) {
+                Class<?> cls = ClassUtils.resolveClassName(bd.getBeanClassName(),resourceLoader.getClassLoader());
+                classes.add(cls);
+            }
+        }
+        //...
+        return rc;
+    }
+    @Bean       //注册过滤器，拦截 /eureka/*请求
+    public FilterRegistrationBean jerseyFilterRegistration(javax.ws.rs.core.Application eurekaJerseyApp) {
+        FilterRegistrationBean bean = new FilterRegistrationBean();
+        bean.setFilter(new ServletContainer(eurekaJerseyApp));
+        bean.setOrder(Ordered.LOWEST_PRECEDENCE);
+        bean.setUrlPatterns(Collections.singletonList("/eureka/*"));    
+        return bean;
+    }
+}
+/**接收 REST接口 注册请求
+* */
+@Produces({"application/xml", "application/json"})
+public class ApplicationResource {
+    @POST       //接收 注册请求
+    @Consumes({"application/json", "application/xml"})
+    public Response addInstance(InstanceInfo info,@HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication) {
+        registry.register(info, "true".equals(isReplication));      //跟register()
+        return Response.status(204).build();  
+    }
+}
+public class InstanceRegistry extends PeerAwareInstanceRegistryImpl implements ApplicationContextAware {
+    @Override
+	public void register(final InstanceInfo info, final boolean isReplication) {
+		handleRegistration(info, resolveInstanceLeaseDuration(info), isReplication);        //跟handleRegistration()
+		super.register(info, isReplication);    //跟super.register()进入 高可用
+	}
+	//跟handleRegistration()
+	private void handleRegistration(InstanceInfo info, int leaseDuration, boolean isReplication) {
+        publishEvent(new EurekaInstanceRegisteredEvent(this, info, leaseDuration, isReplication));  //发送 事件，触发 相应事件 监听器
+    }
+}
+//跟super.register()进入
+public abstract class AbstractInstanceRegistry implements InstanceRegistry {
+    public void register(InstanceInfo registrant, int leaseDuration, boolean isReplication) {
+        try {
+            read.lock();
+            Map<String, Lease<InstanceInfo>> gMap = registry.get(registrant.getAppName());      //registry 存 注册 实例信息，registry是一个map
+            REGISTER.increment(isReplication);
+            if (gMap == null) {
+                final ConcurrentHashMap<String, Lease<InstanceInfo>> gNewMap = new ConcurrentHashMap<String, Lease<InstanceInfo>>();
+                gMap = registry.putIfAbsent(registrant.getAppName(), gNewMap);
+                if (gMap == null) {
+                    gMap = gNewMap;
+                }
+            }
+            //...
+        } finally {
+            read.unlock();
+        }
+    }
+}
+```
+
+```java
+/**
+*2、eureka服务端 高可用
+*/
+public class EurekaServerAutoConfiguration extends WebMvcConfigurerAdapter {
+    @Bean       //eurekaServer上下文初始化
+	public EurekaServerContext eurekaServerContext(ServerCodecs serverCodecs, PeerAwareInstanceRegistry registry, PeerEurekaNodes peerEurekaNodes) {
+		//跟 new DefaultEurekaServerContext()
+        return new DefaultEurekaServerContext(this.eurekaServerConfig, serverCodecs, registry, peerEurekaNodes, this.applicationInfoManager);
+	}
+}
+@Singleton
+public class DefaultEurekaServerContext implements EurekaServerContext {
+@Inject
+    public DefaultEurekaServerContext(EurekaServerConfig serverConfig,ServerCodecs serverCodecs,PeerAwareInstanceRegistry registry,PeerEurekaNodes peerEurekaNodes,ApplicationInfoManager applicationInfoManager) {
+        this.serverConfig = serverConfig;
+        this.serverCodecs = serverCodecs;
+        this.registry = registry;
+        this.peerEurekaNodes = peerEurekaNodes;
+        this.applicationInfoManager = applicationInfoManager;
+    }
+    @PostConstruct      //@PostConstruct 构造方法后自动执行
+    @Override
+    public void initialize() throws Exception {
+        peerEurekaNodes.start();                //跟；刷新 peer列表，并启动更新任务
+        registry.init(peerEurekaNodes);
+    }
+}
+@Singleton
+public class PeerEurekaNodes {
+    public void start() {
+        updatePeerEurekaNodes(resolvePeerUrls());       //跟 updatePeerEurekaNodes()
+    }
+    protected void updatePeerEurekaNodes(List<String> newPeerUrls) {
+        if (newPeerUrls.isEmpty()) {return;}
+        Set<String> toShutdown = new HashSet<>(peerEurekaNodeUrls);     //eureka服务端初始化时，维护了一个 peerEurekaNodeUrls
+        toShutdown.removeAll(newPeerUrls);
+        Set<String> toAdd = new HashSet<>(newPeerUrls);
+        toAdd.removeAll(peerEurekaNodeUrls);
+
+        if (toShutdown.isEmpty() && toAdd.isEmpty()) { // No change
+            return;
+        }
+
+        // Remove peers no long available
+        List<PeerEurekaNode> newNodeList = new ArrayList<>(peerEurekaNodes);
+
+        // Add new peers
+        if (!toAdd.isEmpty()) {
+            for (String peerUrl : toAdd) {
+                newNodeList.add(createPeerEurekaNode(peerUrl));
+            }
+        }
+    }
+}
+/** PeerAwareInstanceRegistryImpl用来同步 renew/register/cancel*/
+@Singleton
+public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry implements PeerAwareInstanceRegistry {
+    @Override
+    public void register(final InstanceInfo info, final boolean isReplication) {
+        int leaseDuration = Lease.DEFAULT_DURATION_IN_SECS; //默认 90
+        if (info.getLeaseInfo() != null && info.getLeaseInfo().getDurationInSecs() > 0) {
+            leaseDuration = info.getLeaseInfo().getDurationInSecs();
+        }
+        super.register(info, leaseDuration, isReplication);
+        replicateToPeers(Action.Register, info.getAppName(), info.getId(), info, null, isReplication);  //跟
+    }
+    private void replicateToPeers(Action action, String appName, String id,InstanceInfo info /* optional */,InstanceStatus newStatus /* optional */, boolean isReplication) {
+        try {
+            if (isReplication) {
+                numberOfReplicationsLastMin.increment();
+            }
+            // If it is a replication already, do not replicate again as this will create a poison replication
+            if (peerEurekaNodes == Collections.EMPTY_LIST || isReplication) {
+                return;
+            }
+
+            for (final PeerEurekaNode node : peerEurekaNodes.getPeerEurekaNodes()) {    //循环当前所有节点
+                // If the url represents this host, do not replicate to yourself.
+                if (peerEurekaNodes.isThisMyUrl(node.getServiceUrl())) {
+                    continue;
+                }
+                replicateInstanceActionsToPeers(action, appName, id, info, newStatus, node);    //将实例同步到 其他节点
+            }
+        } finally {
+            tracer.stop();
+        }
+    }
+}
+```
+```java
+/**3、eureka服务端 剔除 服务*/
+@Configuration
+public class EurekaServerInitializerConfiguration implements ServletContextAware, SmartLifecycle, Ordered {
+    @Override
+    public void start() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    eurekaServerBootstrap.contextInitialized(EurekaServerInitializerConfiguration.this.servletContext); //初始化上下文
+                    publish(new EurekaRegistryAvailableEvent(getEurekaServerConfig()));
+                    EurekaServerInitializerConfiguration.this.running = true;
+                    publish(new EurekaServerStartedEvent(getEurekaServerConfig()));
+                }
+                catch (Exception ex) {}
+            }
+        }).start();
+    }
+    public void contextInitialized(ServletContext context) {
+        try {
+            initEurekaEnvironment();
+            initEurekaServerContext();
+            context.setAttribute(EurekaServerContext.class.getName(), this.serverContext);
+        }
+        catch (Throwable e) {}
+    }
+}
+public class EurekaServerBootstrap {
+    protected void initEurekaServerContext() throws Exception {
+		//...
+		this.registry.openForTraffic(this.applicationInfoManager, registryCount); //跟
+	}
+}
+public abstract class AbstractInstanceRegistry implements InstanceRegistry {
+    protected void postInit() {
+        renewsLastMin.start();
+        if (evictionTaskRef.get() != null) {
+            evictionTaskRef.get().cancel();
+        }
+        evictionTaskRef.set(new EvictionTask());    //创建剔除任务线程，封装到定时任务里
+        evictionTimer.schedule(evictionTaskRef.get(),serverConfig.getEvictionIntervalTimerInMs(),serverConfig.getEvictionIntervalTimerInMs());
+    }
+    class EvictionTask extends TimerTask {
+        private final AtomicLong lastExecutionNanosRef = new AtomicLong(0l);
+        @Override
+        public void run() {
+            try {
+                long compensationTimeMs = getCompensationTimeMs();
+                evict(compensationTimeMs);  //跟
+            } catch (Throwable e) {}
+        }
+    }
+    public void evict(long additionalLeaseMs) {
+        if (!isLeaseExpirationEnabled()) {return;}      //开启自我保护模式，直接返回，不会执行后面的 剔除
+        List<Lease<InstanceInfo>> expiredLeases = new ArrayList<>();
+        //..
+    }
+}
+```
 ####Eureka 客户端 源码分析
 ```text
 springboot启动时，会扫描 spring-cloud-netflix-eureka-client包META-INF目录下的spring.factories，内容如下：
@@ -123,33 +350,12 @@ public class DiscoveryClient implements EurekaClient {
     DiscoveryClient(ApplicationInfoManager applicationInfoManager, EurekaClientConfig config, AbstractDiscoveryClientOptionalArgs args, Provider<BackupRegistry> backupRegistryProvider) {
         initScheduledTasks();
     }
-    /**
-    * 拉取其他服务实例到本地
-    * 注册 将自己注册到eureka-server
-    * */
+    /**启动前 初始化*/
     private void initScheduledTasks() {
-        if (clientConfig.shouldFetchRegistry()) {
-            // registry cache refresh timer
-            int registryFetchIntervalSeconds = clientConfig.getRegistryFetchIntervalSeconds();
-            int expBackOffBound = clientConfig.getCacheRefreshExecutorExponentialBackOffBound();
-            scheduler.schedule(
-                    new TimedSupervisorTask(
-                            "cacheRefresh",
-                            scheduler,
-                            cacheRefreshExecutor,
-                            registryFetchIntervalSeconds,
-                            TimeUnit.SECONDS,
-                            expBackOffBound,
-                            new CacheRefreshThread()
-                    ),
-                    registryFetchIntervalSeconds, TimeUnit.SECONDS);
-        }
-
         if (clientConfig.shouldRegisterWithEureka()) {
             int renewalIntervalInSecs = instanceInfo.getLeaseInfo().getRenewalIntervalInSecs();
             int expBackOffBound = clientConfig.getHeartbeatExecutorExponentialBackOffBound();
-
-            //心跳检测
+            //心跳检测；开启 ScheduledExecutorService 定时任务
             scheduler.schedule(
                     new TimedSupervisorTask(
                             "heartbeat",
@@ -158,44 +364,29 @@ public class DiscoveryClient implements EurekaClient {
                             renewalIntervalInSecs,
                             TimeUnit.SECONDS,
                             expBackOffBound,
-                            new HeartbeatThread()
+                            new HeartbeatThread()       //跟 new HeartbeatThread()
                     ),
                     renewalIntervalInSecs, TimeUnit.SECONDS);
-
-            // InstanceInfo replicator
-            instanceInfoReplicator = new InstanceInfoReplicator(
-                    this,
-                    instanceInfo,
-                    clientConfig.getInstanceInfoReplicationIntervalSeconds(),
-                    2); // burstSize
-
-            statusChangeListener = new ApplicationInfoManager.StatusChangeListener() {
-                @Override
-                public String getId() {
-                    return "statusChangeListener";
-                }
-
-                @Override
-                public void notify(StatusChangeEvent statusChangeEvent) {
-                    if (InstanceStatus.DOWN == statusChangeEvent.getStatus() ||
-                            InstanceStatus.DOWN == statusChangeEvent.getPreviousStatus()) {
-                        // log at warn level if DOWN was involved
-                        logger.warn("Saw local status change event {}", statusChangeEvent);
-                    } else {
-                        logger.info("Saw local status change event {}", statusChangeEvent);
-                    }
-                    instanceInfoReplicator.onDemandUpdate();
-                }
-            };
-
-            if (clientConfig.shouldOnDemandUpdateStatusChange()) {
-                applicationInfoManager.registerStatusChangeListener(statusChangeListener);
-            }
-
-            instanceInfoReplicator.start(clientConfig.getInitialInstanceInfoReplicationIntervalSeconds());
-        } else {
-            logger.info("Not registering with Eureka server per configuration");
+                //...
         }
+    }
+    private class HeartbeatThread implements Runnable {
+        public void run() {
+            if (renew()) {      //renew()表示刷新 跟
+                lastSuccessfulHeartbeatTimestamp = System.currentTimeMillis();
+            }
+        }
+    }
+    boolean renew() {
+        EurekaHttpResponse<InstanceInfo> httpResponse;
+        try {
+            httpResponse = eurekaTransport.registrationClient.sendHeartBeat(instanceInfo.getAppName(), instanceInfo.getId(), instanceInfo, null);
+            if (httpResponse.getStatusCode() == 404) {      //向服务端获取 当前服务实例信息，如果返回404 表示服务端没有当前实例信息，则进入注册流程
+                REREGISTER_COUNTER.increment();
+                return register();      //register() 表示 eureka客户端 instance信息 注册到 eureka服务端
+            }
+            return httpResponse.getStatusCode() == 200;     //在eureka服务端获取到 当前实例信息，则返回200
+        }catch (Exception e){}
     }
 }
 ```
