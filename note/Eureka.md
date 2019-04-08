@@ -1,161 +1,213 @@
+#SpringCloud
+```text
 1、eureka是springcloud的核心；
 2、配置中心，对各模块配置文件进行集中化管理；
 3、消费者怎么去调用提供者，会用到 1个工具 2个组件 ribbon feign；
 4、服务的 限流 熔断 机制；
 5、网关组件，因为微服务一般不对外的，因此使用网关Zuul，将外部 http请求映射到 服务上；
-6、微服务就需要知道事件驱动，目前，系统之间都是通过 http接口 调用的，但是有些情况下，可以通过 rabbitMQ
-解耦的，springcloud提供了 消息总线组件，它集成了rabbitmq，kafka，来实现事件驱动，因此需要学习springcloud
+6、微服务就需要知道事件驱动，目前，系统之间都是通过 http接口 调用的，但是有些情况下，可以通过 rabbitMQ解耦的，springcloud提供了 消息总线组件，它集成了rabbitmq，kafka，来实现事件驱动，因此需要学习springcloud
 中事件驱动怎么做；
-7、请求到网关 Zuul，映射到 服务1 进行下单，是需要调到很多系统的，如果用户请求失败了，要去跟踪原因，传统
-的日志只是单系统的，系统之间日志如何关联呢？需要 分布式服务调用追踪组件 sleuth；并使用ELK整理整个集群的
-信息；
------------------------------------------------------------------------------------------
+7、请求到网关 Zuul，映射到 服务1 进行下单，是需要调到很多系统的，如果用户请求失败了，要去跟踪原因，传统的日志只是单系统的，系统之间日志如何关联呢？需要 分布式服务调用追踪组件 sleuth；并使用ELK整理整个集群的信息
+```
+##Eureka
+```text
 为什么使用 eureka？
-大型系统，会拆分成很多子系统；每个子系统有 2个功能：提供接口，调用接口，这样的子系统就是一个微服务；
-每个微服务要部署多个实例，且会动态扩容，ip不固定，因此需要 eureka组件 进行服务的管理，eureka服务管理核心：服务 Id 为唯一标识；
-******************************************************************************************
-重点：1个服务，部署到多台机器上，形成 多个实例，且各个实例的 服务Id都相同；
-******************************************************************************************
-
-eureka结构：1个服务端 + 2个客户端(服务提供者，服务调用者)；
-eureka服务端引入 spring-cloud-starter-eureka-server包；
-eureka客户端引入 spring-cloud-starter-eureka包；
-
+    当 服务启动时，将自己的 服务名 ip port 实例id 注册到 eureka-server，并从eureka-server上拉取所有其他服务的 服务名 ip port 实例id 缓存在本地；
+    一个服务 有多个实例，各实例 服务名相同，ip port 实例id不同，同一个服务名 下有多个 ip port 可以调，因此需要负载均衡 从里面选择一个ip port进行调用；
+    服务名         ip          port        instanceID
+    serviceA      101          8080         101
+    serviceA      202          9090         202
+eureka结构？
+    eureka-server + eureka-instance + eureka-client：eureka-client 向 eureka-server 注册或者拉取 eureka-instance；
 eureka原理分析：
-1、服务提供者怎么注册到服务中心的？
-2、注册中心怎么接收注册请求？
-3、注册中心如何存储服务信息？
-4、注册中心高可用机制是什么？
-5、Eureka集群同步机制？
-6、注册中心剔除服务的机制？
-7、服务消费者如何获取服务信息？
-
-创建maven子模块 eureka-server，pom.xml，pom.xml中需要导入 eureka的启动包；
-配置 bootstrap.yml，该文件里面主要配置 服务名称，该配置文件在application.yml之前加载；
-application.yml里面进行eureka相关配置；
-启动 EurekaServerApplication类，该类上面需要加相关注解，即可启动springboot项目；
-
-*****************************************************************************************
-eureka服务端页面：前面是 服务Id，后面是实例id；一个服务部署到多台机器时，后面有多个实例Id*
-*****************************************************************************************
-
-创建maven子模块 lesson-1-sms-interface，作为服务提供者
-浏览器：http://localhost:9002/，返回接口信息如下：
-{
-  "_links" : {
-    "sms" : {
-      "href" : "http://localhost:9002/sms{?page,size,sort}",
-      "templated" : true
-    },
-    "profile" : {
-      "href" : "http://localhost:9002/profile"
-    }
-  }
-}
-postman发送post请求 http://localhost:9002/sms ，发送的 json内容如下：
-{
-	"phone":"123",
-	"content":"haha"
-}
-postman发送get请求 http://localhost:9002/sms/1，获取刚才发送的json数据；
-
-创建maven子模块 lesson-1-website，作为服务调用者，调用 /test接口，里面调用 lesson-1-sms-interface服务的 /sms接口；
----
----eureka服务端 客户端源码分析
+    1、服务提供者怎么注册到服务中心的？
+    2、注册中心怎么接收注册请求？
+    3、注册中心如何存储服务信息？
+    4、注册中心高可用机制是什么？
+    5、Eureka集群同步机制？
+    6、注册中心剔除服务的机制？
+    7、服务消费者如何获取服务信息？
+```
+###Eureka源码分析
+####Eureka 服务端 源码分析
 2、springcloud中 eureka服务端和客户端是怎么通过注解生效的？
-eureka服务端初始化：
-在项目的 External Libraries中找到spring-cloud-netflix-eureka-server，这个是 eureka服务端的包；不在spring-cloud-starter-eureka-server包；
-springboot启动时，会扫描该包META-INF目录下的spring.factories，内容如下：
+```text
+springboot启动时，会扫描spring-cloud-netflix-eureka-server包 META-INF/spring.factories，内容如下：
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
   org.springframework.cloud.netflix.eureka.server.EurekaServerAutoConfiguration     # eureka服务端初始化
-该文件定义了初始化配置对应的类；可以通过 ctr + N 查找EurekaServerAutoConfiguration类；
+spring.factories中这样定义目的：springboot启动时会 自动装配 以EnableAutoConfiguration为key的value，因此EurekaServerAutoConfiguration会被 实例化到当前IOC容器
+```
 
-eureka客户端初始化：
-在项目的 External Libraries中找到spring-cloud-netflix-eureka-client，这个是 eureka 客户端的包；
-springboot启动时，会扫描该包META-INF目录下的spring.factories，内容如下：
-
+####Eureka 客户端 源码分析
+```text
+springboot启动时，会扫描 spring-cloud-netflix-eureka-client包META-INF目录下的spring.factories，内容如下：
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-org.springframework.cloud.netflix.eureka.config.EurekaClientConfigServerAutoConfiguration,\     #不用关注
-org.springframework.cloud.netflix.eureka.config.EurekaDiscoveryClientConfigServiceAutoConfiguration,\     #不用关注
-org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration,\    # eureka客户端初始化
-org.springframework.cloud.netflix.ribbon.eureka.RibbonEurekaAutoConfiguration     #不用关注，在Ribbon模块关注
-org.springframework.cloud.bootstrap.BootstrapConfiguration=\
-org.springframework.cloud.netflix.eureka.config.EurekaDiscoveryClientConfigServiceBootstrapConfiguration
-org.springframework.cloud.client.discovery.EnableDiscoveryClient=\
-org.springframework.cloud.netflix.eureka.EurekaDiscoveryClientConfiguration
+  org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration,\    # eureka客户端初始化
+  org.springframework.cloud.netflix.eureka.EurekaDiscoveryClientConfiguration    # eureka客户端初始化
+spring.factories中这样定义目的：springboot启动时会 自动装配 以EnableAutoConfiguration为key的value，因此EurekaClientAutoConfiguration,EurekaDiscoveryClientConfiguration会被 实例化到当前IOC容器
+```
+```text
+注册：eureka-client 怎么把 instance(appName,ip,port,instanceId) 注册到 eureka-server？
+```
 
-org.springframework.cloud.client.discovery.EnableDiscoveryClient=\
-org.springframework.cloud.netflix.eureka.EurekaDiscoveryClientConfiguration    # eureka客户端初始化
-
-重点关注类：EurekaClientAutoConfiguration，EurekaDiscoveryClientConfiguration；
-该文件定义了初始化配置对应的类；可以通过 ctr + N 查找EurekaClientAutoConfiguration类；
-
-3、eureka客户端作为服务提供者，怎么注册到eureka服务端的？
-将服务的信息(ip,port,serviceId,instanceId)注册到eureka服务端；
-跟EurekaClientAutoConfiguration#eurekaApplicationInfoManager()方法，如下：
-@Bean
-@ConditionalOnMissingBean(value = {ApplicationInfoManager.class},search = SearchStrategy.CURRENT)
-public ApplicationInfoManager eurekaApplicationInfoManager(EurekaInstanceConfig config) {
-    InstanceInfo instanceInfo = (new InstanceInfoFactory()).create(config);
-    return new ApplicationInfoManager(config, instanceInfo);
+```java
+/**将 eureka.instance为前缀的配置信息 封装到 InstanceInfo里，并一起封装到 ApplicationInfoManager*/
+@Configuration
+public class EurekaClientAutoConfiguration {
+    @Configuration
+    protected static class EurekaClientConfiguration {
+        @Bean(destroyMethod = "shutdown")
+        @ConditionalOnMissingBean(value = EurekaClient.class, search = SearchStrategy.CURRENT)
+        public EurekaClient eurekaClient(ApplicationInfoManager manager, EurekaClientConfig config) {
+            return new CloudEurekaClient(manager, config, this.optionalArgs,
+                    this.context);
+        }
+        @Bean
+        @ConditionalOnMissingBean(value = {ApplicationInfoManager.class},search = SearchStrategy.CURRENT)
+        public ApplicationInfoManager eurekaApplicationInfoManager(EurekaInstanceConfig config) {
+            InstanceInfo instanceInfo = (new InstanceInfoFactory()).create(config);
+            return new ApplicationInfoManager(config, instanceInfo);
+        }
+    }
 }
-跟 create()方法，进入 InstanceInfoFactory类，方法如下：
-public InstanceInfo create(EurekaInstanceConfig config) {
-   ...
-   builder.setNamespace(namespace).setAppName(config.getAppname()).
-   setInstanceId(config.getInstanceId()).setAppGroupName(config.getAppGroupName()).
-   setDataCenterInfo(config.getDataCenterInfo()).setIPAddr(config.getIpAddress()).
-   setHostName(config.getHostName(false)).setPort(config.getNonSecurePort()).
-   enablePort(PortType.UNSECURE, config.isNonSecurePortEnabled()).
-   setSecurePort(config.getSecurePort()).
-   enablePort(PortType.SECURE, config.getSecurePortEnabled()).
-   setVIPAddress(config.getVirtualHostName()).
-   setSecureVIPAddress(config.getSecureVirtualHostName()).
-   setHomePageUrl(config.getHomePageUrlPath(), config.getHomePageUrl()).
-   setStatusPageUrl(config.getStatusPageUrlPath(), config.getStatusPageUrl()).
-   setHealthCheckUrls(config.getHealthCheckUrlPath(), config.getHealthCheckUrl(), config.getSecureHealthCheckUrl()).
-   setASGName(config.getASGName());
-   ...
-}
-其中，将配置文件中内容 封装到 config中，然后从 config中取出属性内容，存入 builder中；
-EurekaInstanceConfig是一个接口，有3个重要实现，ctr + shift + 左键单击，选择EurekaInstanceConfigBean
-代码如下：
-@ConfigurationProperties("eureka.instance")
-public class EurekaInstanceConfigBean implements CloudEurekaInstanceConfig, EnvironmentAware {
+/**跟 InstanceInfoFactory#create()*/
+public class InstanceInfoFactory {
 
+    public InstanceInfo create(EurekaInstanceConfig config) {/**EurekaInstanceConfig 实现类  EurekaInstanceConfigBean，将 以eureka.instance为前缀的配置 封装到该实现类*/
+        LeaseInfo.Builder leaseInfoBuilder = LeaseInfo.Builder.newBuilder().setRenewalIntervalInSecs(config.getLeaseRenewalIntervalInSeconds())
+            .setDurationInSecs(config.getLeaseExpirationDurationInSeconds());
+
+        InstanceInfo.Builder builder = InstanceInfo.Builder.newBuilder();
+        
+        String namespace = config.getNamespace();
+        if (!namespace.endsWith(".")) {
+            namespace = namespace + ".";
+        }
+        builder.setNamespace(namespace).setAppName(config.getAppname())
+                .setInstanceId(config.getInstanceId())
+                .setAppGroupName(config.getAppGroupName())
+                .setDataCenterInfo(config.getDataCenterInfo())
+                .setIPAddr(config.getIpAddress()).setHostName(config.getHostName(false))
+                .setPort(config.getNonSecurePort())
+                .enablePort(InstanceInfo.PortType.UNSECURE,
+                        config.isNonSecurePortEnabled())
+                .setSecurePort(config.getSecurePort())
+                .enablePort(InstanceInfo.PortType.SECURE, config.getSecurePortEnabled())
+                .setVIPAddress(config.getVirtualHostName())
+                .setSecureVIPAddress(config.getSecureVirtualHostName())
+                .setHomePageUrl(config.getHomePageUrlPath(), config.getHomePageUrl())
+                .setStatusPageUrl(config.getStatusPageUrlPath(),
+                        config.getStatusPageUrl())
+                .setHealthCheckUrls(config.getHealthCheckUrlPath(),
+                        config.getHealthCheckUrl(), config.getSecureHealthCheckUrl())
+                .setASGName(config.getASGName());
+        //...
+	}
 }
-其中，@ConfigurationProperties("eureka.instance")是用来读取配置文件application.yml的，读取规则如下：
-例如，读取 application.yml文件，内容如下：
-eureka:
-  client:
-    registerWithEureka: true
-    fetchRegistry: true
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    leaseRenewalIntervalInSeconds: 30
-读取 eureka.instance开头的信息；
+/**实例化DiscoveryClient的一个子类 CloudEurekaClient*/
+@Configuration
+public class EurekaClientAutoConfiguration {
+    @Configuration
+    protected static class EurekaClientConfiguration {
+        @Bean(destroyMethod = "shutdown")
+        @ConditionalOnMissingBean(value = EurekaClient.class, search = SearchStrategy.CURRENT)
+        public EurekaClient eurekaClient(ApplicationInfoManager manager, EurekaClientConfig config) {
+            return new CloudEurekaClient(manager, config, this.optionalArgs,this.context);  //跟
+        }
+    }
+}
+/**跟 new CloudEurekaClient() 到 DiscoveryClient构造方法中，里面调用 initScheduledTasks()初始化定时任务*/
+@Singleton
+public class DiscoveryClient implements EurekaClient {
+    @Inject
+    DiscoveryClient(ApplicationInfoManager applicationInfoManager, EurekaClientConfig config, AbstractDiscoveryClientOptionalArgs args, Provider<BackupRegistry> backupRegistryProvider) {
+        initScheduledTasks();
+    }
+    /**
+    * 拉取其他服务实例到本地
+    * 注册 将自己注册到eureka-server
+    * */
+    private void initScheduledTasks() {
+        if (clientConfig.shouldFetchRegistry()) {
+            // registry cache refresh timer
+            int registryFetchIntervalSeconds = clientConfig.getRegistryFetchIntervalSeconds();
+            int expBackOffBound = clientConfig.getCacheRefreshExecutorExponentialBackOffBound();
+            scheduler.schedule(
+                    new TimedSupervisorTask(
+                            "cacheRefresh",
+                            scheduler,
+                            cacheRefreshExecutor,
+                            registryFetchIntervalSeconds,
+                            TimeUnit.SECONDS,
+                            expBackOffBound,
+                            new CacheRefreshThread()
+                    ),
+                    registryFetchIntervalSeconds, TimeUnit.SECONDS);
+        }
+
+        if (clientConfig.shouldRegisterWithEureka()) {
+            int renewalIntervalInSecs = instanceInfo.getLeaseInfo().getRenewalIntervalInSecs();
+            int expBackOffBound = clientConfig.getHeartbeatExecutorExponentialBackOffBound();
+
+            //心跳检测
+            scheduler.schedule(
+                    new TimedSupervisorTask(
+                            "heartbeat",
+                            scheduler,
+                            heartbeatExecutor,
+                            renewalIntervalInSecs,
+                            TimeUnit.SECONDS,
+                            expBackOffBound,
+                            new HeartbeatThread()
+                    ),
+                    renewalIntervalInSecs, TimeUnit.SECONDS);
+
+            // InstanceInfo replicator
+            instanceInfoReplicator = new InstanceInfoReplicator(
+                    this,
+                    instanceInfo,
+                    clientConfig.getInstanceInfoReplicationIntervalSeconds(),
+                    2); // burstSize
+
+            statusChangeListener = new ApplicationInfoManager.StatusChangeListener() {
+                @Override
+                public String getId() {
+                    return "statusChangeListener";
+                }
+
+                @Override
+                public void notify(StatusChangeEvent statusChangeEvent) {
+                    if (InstanceStatus.DOWN == statusChangeEvent.getStatus() ||
+                            InstanceStatus.DOWN == statusChangeEvent.getPreviousStatus()) {
+                        // log at warn level if DOWN was involved
+                        logger.warn("Saw local status change event {}", statusChangeEvent);
+                    } else {
+                        logger.info("Saw local status change event {}", statusChangeEvent);
+                    }
+                    instanceInfoReplicator.onDemandUpdate();
+                }
+            };
+
+            if (clientConfig.shouldOnDemandUpdateStatusChange()) {
+                applicationInfoManager.registerStatusChangeListener(statusChangeListener);
+            }
+
+            instanceInfoReplicator.start(clientConfig.getInitialInstanceInfoReplicationIntervalSeconds());
+        } else {
+            logger.info("Not registering with Eureka server per configuration");
+        }
+    }
+}
+```
+
 
 eureka配置类如下：
 InstanceRegistryProperties，EurekaServerConfigBean，EurekaClientConfigBean，EurekaInstanceConfigBean，EurekaDashboardProperties；
 
-跟EurekaClientAutoConfiguration#eurekaClient() ，实例化DiscoveryClient的一个子类，代码如下：
-@Bean(destroyMethod = "shutdown")
-@ConditionalOnMissingBean(value = EurekaClient.class, search = SearchStrategy.CURRENT)
-public EurekaClient eurekaClient(ApplicationInfoManager manager, EurekaClientConfig config) {
-    //跟 new CloudEurekaClient()，代码如下
-    return new CloudEurekaClient(manager, config, this.optionalArgs, this.context);
-}
-CloudEurekaClient构造方法如下：
-public CloudEurekaClient(ApplicationInfoManager applicationInfoManager,EurekaClientConfig config,DiscoveryClientOptionalArgs args,ApplicationEventPublisher publisher) {
-    //跟super()，代码如下
-    super(applicationInfoManager, config, args);
-    this.applicationInfoManager = applicationInfoManager;
-    this.publisher = publisher;
-    this.eurekaTransportField = ReflectionUtils.findField(DiscoveryClient.class, "eurekaTransport");
-    ReflectionUtils.makeAccessible(this.eurekaTransportField);
-}
-super()代码如下，发现CloudEurekaClient是DiscoveryClient的子类；
+
+
+
+
 @Deprecated
 public DiscoveryClient(ApplicationInfoManager applicationInfoManager, final EurekaClientConfig config, DiscoveryClientOptionalArgs args) {
     //跟this()，代码如下：

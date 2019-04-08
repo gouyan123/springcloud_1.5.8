@@ -14,6 +14,11 @@ public class Demo04 {
                 .subscribe(new Action1<Integer>() {
                     @Override
                     public void call(Integer number) {
+                        try {
+                            Thread.sleep(2000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
 //                        Log.d(tag, "number:" + number);
                         System.out.println(Thread.currentThread().getName() + " number:" + number);
                     }

@@ -12,7 +12,7 @@
 	<artifactId>lesson-4-ribbon</artifactId>
 	<version>1.0.0</version>
 	<packaging>jar</packaging>
-	<name>Ribbon服务负载均衡探秘</name>
+	<name>lesson-4-ribbon</name>
 	<!-- 依赖 -->
 	<dependencyManagement>
 		<dependencies>

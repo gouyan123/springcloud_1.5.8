@@ -1,6 +1,5 @@
 package com.dongnaoedu.springcloud.rxJava;
 
-
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;

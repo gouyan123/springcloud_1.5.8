@@ -9,10 +9,10 @@
 	</parent>
 	<!-- 系统描述 -->
 	<groupId>com.dongnaoedu.springcloud</groupId>
-	<artifactId>lesson-3-feign-examples</artifactId>
+	<artifactId>lesson-3-feign</artifactId>
 	<version>1.0.0</version>
 	<packaging>jar</packaging>
-	<name>Ribbon服务负载均衡探秘</name>
+	<name>lesson-3-feign</name>
 	<!-- 依赖 -->
 	<dependencyManagement>
 		<dependencies>
