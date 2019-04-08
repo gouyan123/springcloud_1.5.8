@@ -29,6 +29,24 @@ eureka原理分析：
     7、服务消费者如何获取服务信息？
 ```
 ###Eureka源码分析
+#### Eureka源码分析总结
+```text
+1、Spring框架中，实现 XxxAware接口，要覆写 setXxx(Xxx xx)方法，Spring会自动将Xxx设置进来，例如 ApplicationContextAware{ void setApplicationContext(ApplicationContext applicationContext) throws BeansException;}
+2、Spring框架中，实现 SmartLifeCycle接口，覆写 start()方法，当 刷新上下文，所有bean被实例化 初始化以后，会执行 该bean的 start()方法，见 com.dongnaoedu.springcloud.SmartLifecycleDemo
+3、web.xml的加载顺序是：Context-Param -> Listener -> Filter -> Servlet，先将Context-Param 即参数封装到 ServletContext，然后通过setServletContext()方法 将ServletContext设置到各个类中；
+ContextLoaderListener#contextInitialized(ServletContextEvent event)方法 监听ServletContextEvent事件；
+```
+```xml
+<web-app>
+    <context-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:applicationContext-*.xml</param-value>
+    </context-param>
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+</web-app>
+```
 ####Eureka 服务端 源码分析
 2、springcloud中 eureka服务端和客户端是怎么通过注解生效的？
 ```text
@@ -49,7 +67,7 @@ spring.factories中这样定义目的：springboot启动时会 自动装配 以E
 * 初始化过程，springcloud集成 eureka原生包中的 Jersey REST接口框架*/
 @Configuration
 public class EurekaServerAutoConfiguration extends WebMvcConfigurerAdapter {
-    @Bean
+    @Bean   //实例化 一个 JerseyApplication
     public javax.ws.rs.core.Application jerseyApplication(Environment environment, ResourceLoader resourceLoader) {
         //...
         for (String basePackage : EUREKA_PACKAGES) {    //EUREKA_PACKAGES = new String[] { "com.netflix.discovery","com.netflix.eureka" }; 扫描eureka下的包
@@ -71,7 +89,7 @@ public class EurekaServerAutoConfiguration extends WebMvcConfigurerAdapter {
         return bean;
     }
 }
-/**接收 REST接口 注册请求
+/**jersey框架 接收 REST接口 注册请求
 * */
 @Produces({"application/xml", "application/json"})
 public class ApplicationResource {
@@ -128,7 +146,7 @@ public class EurekaServerAutoConfiguration extends WebMvcConfigurerAdapter {
 }
 @Singleton
 public class DefaultEurekaServerContext implements EurekaServerContext {
-@Inject
+    @Inject
     public DefaultEurekaServerContext(EurekaServerConfig serverConfig,ServerCodecs serverCodecs,PeerAwareInstanceRegistry registry,PeerEurekaNodes peerEurekaNodes,ApplicationInfoManager applicationInfoManager) {
         this.serverConfig = serverConfig;
         this.serverCodecs = serverCodecs;
@@ -136,7 +154,7 @@ public class DefaultEurekaServerContext implements EurekaServerContext {
         this.peerEurekaNodes = peerEurekaNodes;
         this.applicationInfoManager = applicationInfoManager;
     }
-    @PostConstruct      //@PostConstruct 构造方法后自动执行
+    @PostConstruct      //@PostConstruct 加载Servlet 后运行，且只运行一次
     @Override
     public void initialize() throws Exception {
         peerEurekaNodes.start();                //跟；刷新 peer列表，并启动更新任务
@@ -184,7 +202,7 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
     }
     private void replicateToPeers(Action action, String appName, String id,InstanceInfo info /* optional */,InstanceStatus newStatus /* optional */, boolean isReplication) {
         try {
-            if (isReplication) {
+            if (isReplication) {     //防止循环传播   
                 numberOfReplicationsLastMin.increment();
             }
             // If it is a replication already, do not replicate again as this will create a poison replication
@@ -262,6 +280,16 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
         if (!isLeaseExpirationEnabled()) {return;}      //开启自我保护模式，直接返回，不会执行后面的 剔除
         List<Lease<InstanceInfo>> expiredLeases = new ArrayList<>();
         //..
+    }
+}
+public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry implements PeerAwareInstanceRegistry {
+    @Override
+    public boolean isLeaseExpirationEnabled() {
+        if (!isSelfPreservationModeEnabled()) {     //开启自我保护模式，不会剔除 实例信息，如果关闭自我保护模式，判断最后一分钟接收到心跳数是否达到阈值，达到阈值，会进行剔除，达不到阈值，不会剔除
+            return true;
+        }
+        //当 最后一分钟收到实例心跳数getNumOfRenewsInLastMin() > 每分钟收到实例心跳数numberOfRenewsPerMinThreshold时，证明网络没问题，eureka不会关闭剔除
+        return numberOfRenewsPerMinThreshold > 0 && getNumOfRenewsInLastMin() > numberOfRenewsPerMinThreshold;  
     }
 }
 ```
