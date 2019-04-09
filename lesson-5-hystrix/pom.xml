@@ -12,7 +12,7 @@
 	<artifactId>lesson-5-hystrix</artifactId>
 	<version>1.0.0</version>
 	<packaging>jar</packaging>
-	<name>熔断机制</name>
+	<name>lesson-5-hystrix</name>
 	<!-- 依赖 -->
 	<dependencyManagement>
 		<dependencies>

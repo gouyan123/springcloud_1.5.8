@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-// resttemplate的方式
+// resttemplate与Ribbon集成
 @RestController
 @RequestMapping("/resttemplate")
 @Configuration
@@ -26,7 +26,6 @@ public class TestResttemplateController {
 	RestTemplate RestTemplate() {
 		// ribbon feign是一个公司开源，很好的集成
 		// resttemplate是spring的
-		// 这是为了设置超时
 		SimpleClientHttpRequestFactory simpleClientHttpRequestFactory = new SimpleClientHttpRequestFactory();
 		simpleClientHttpRequestFactory.setReadTimeout(2000);
 		simpleClientHttpRequestFactory.setConnectTimeout(2000);

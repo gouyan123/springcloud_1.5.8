@@ -6,17 +6,33 @@
 ![Ribbon流程图](assert/Ribbon流程图.png)
 ## Ribbon 原理
 ```text
-每个服务 都有一个独立的 负载均衡器 ILoadBalancer；
+每个服务 都有一个独立的 负载均衡器 ILoadBalancer，ILoadBalancer = 该服务的实例列表 + 负载均衡策略；
 List<Server>存 该服务 服务实例列表，数据源于 配置信息ConfigurationBasedServerList 或者 EurekaRibbonClientConfiguration.ribbonServerList；
 chooseServer(Object key)：根据负载均衡策略 从多个 服务实例中选择一个合适的实例；
 ```
 ![Ribbon负载均衡器原理](assert/Ribbon负载均衡器原理.png)
 ## Ribbon 3种配置方式
+
+```yaml
+# 3、ribbon通过eureka进行负载均衡；重点：重试方案；
+ribbon:
+  eureka:
+    enabled: true                 # 开启eureka与ribbon的集成
+  hystrix: 
+    enabled: false                # 暂不开启熔断机制
+  ConnectTimeout: 2000            # 配置ribbon默认的超时时间
+  ReadTimeout: 2000
+  OkToRetryOnAllOperations: true  # 开启重试 重试有 2种情况：一个服务有多个实例，1、始终在一个实例上重试；2、一个实例请求不通，换一个实例再请求；总的超时时间 = (ConnectTimeout + ReadTimeout) * (MaxAutoRetriesNextServer + 1) * (MaxAutoRetries + 1)
+  MaxAutoRetriesNextServer: 1     # 重试期间，实例切换次数	 比如：该服务有100个实例，只会在 2个实例上面去重试
+  MaxAutoRetries: 0               # 当前实例重试次数
+  
+```
+
 ```text
-1、application.yml中直接配置；2、@RibbonClient；3、ribbon与eureka集成使用；
+1、application.yml中直接配置；2、@RibbonClient；3、ribbon与eureka集成使用，ribbon会自动创建负载均衡器，不需要额外配置；
  ```
 ```yaml
-# 1、application.yml中直接配置 ribbon；
+# 1、application.yml中直接配置 负载均衡器；
 service-by-properties:            # 请求 service-by-properties服务时，从下面服务列表找
   listOfServers: http://www.csdn.net,http://www.baidu.com,http://www.dongnaoedu.com # 服务实例列表
   MaxAutoRetriesNextServer: 0           # 这个负载均衡器不做重试
@@ -31,9 +47,9 @@ service-by-properties:            # 请求 service-by-properties服务时，从�
 public class RibbonSampleApplication {
     //...
 }
+/**负载均衡器配置类 = 该服务的 服务实例列表 + 负载均衡策略；注意：子容器 不能加 @Configuration*/
 public class ServiceByAnnontationConfiguration {
-	// 实例源
-	// service-by-annotation
+	// service-by-annotation 服务的实例源
 	@Bean
 	public ServerList<Server> ribbonServerList() {
 		// 实例列表
@@ -48,38 +64,22 @@ public class ServiceByAnnontationConfiguration {
 		for (int i = 0; i < len; i++) {
 			servers[i] = new Server(splits[i].trim());
 		}
-		// 返回这个...静态的
-		return new StaticServerList<Server>(servers);
+		return new StaticServerList<Server>(servers);		// 返回这个...静态的
 	}
 
-	// 负载策略
 	@Bean
-	public IRule iniRule() {
-		// 随机
-		return new RandomRule();
+	public IRule iniRule() {            // 负载策略
+		return new RandomRule();		// 随机
 	}
 }
-```
-```yaml
-# 3、ribbon通过eureka进行负载均衡
-ribbon:
-  eureka:
-    enabled: true                 # 开启eureka与ribbon的集成
-  hystrix: 
-    enabled: false                # 暂不开启熔断机制
-  ConnectTimeout: 2000            # 配置ribbon默认的超时时间
-  ReadTimeout: 2000
-  OkToRetryOnAllOperations: true  # 是否开启重试
-  MaxAutoRetriesNextServer: 3     # 重试期间，实例切换次数	 比如：100个实例，我只会在四个实例上面去重试
-  MaxAutoRetries: 2               # 当前实例重试次数
 ```
 
 ## Ribbon 3种使用方式
 ```text
 见 way包：
-1、TestLoadBalancerClientController类，通过LoadbalancerClient对象，选择服务的一个实例，ServiceInstance serviceInstance = loadbalancerClient.choose("service-by-properties")
-2、TestResttemplateController类，通过restTemplate对象，选择服务的一个实例，String body = restTemplate.getForObject("http://service-by-properties/", String.class);
-3、TestFeignController类
+1、LoadbalancerClient：TestLoadBalancerClientController类，通过LoadbalancerClient对象，选择服务的一个实例，ServiceInstance serviceInstance = loadbalancerClient.choose("service-by-properties")
+2、RestTemplate：TestResttemplateController类，通过restTemplate对象，选择服务的一个实例，String body = restTemplate.getForObject("http://service-by-properties/", String.class);
+3、Feign：TestFeignController类
 ```
 
 ## Ribbon 源码分析
