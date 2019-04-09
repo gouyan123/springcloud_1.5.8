@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit;
 public class ScheduledExecutorServiceDemo {
 
     public static void main(String[] args) {
+        /**线程池分 4种：
+         * 定时线程池：提交 线程任务后，线程任务 会重复定时执行*/
         ScheduledExecutorService schedule = Executors.newScheduledThreadPool(3);
         long initialDelay = 1;
         long period = 1;

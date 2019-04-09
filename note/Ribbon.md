@@ -1,40 +1,22 @@
-#Ribbon 客户端负载均衡
+# Ribbon 客户端负载均衡
 ```text
 客户端负载均衡：
 一个服务，多个实例，如何选择调用实例？调用实例之前，先去eureka服务端 获取该服务的所有实例，根据Ribbon的负载均衡策略，选择一个合适的实例，然后发起请求调用该实例；
 ```
 ![Ribbon流程图](assert/Ribbon流程图.png)
-
-
+## Ribbon 原理
 ```text
-Ribbon 3种配置方式：
-1、application.yml中直接配置；2、@Bean；3、ribbon与eureka集成使用；
+每个服务 都有一个独立的 负载均衡器 ILoadBalancer；
+List<Server>存 该服务 服务实例列表，数据源于 配置信息ConfigurationBasedServerList 或者 EurekaRibbonClientConfiguration.ribbonServerList；
+chooseServer(Object key)：根据负载均衡策略 从多个 服务实例中选择一个合适的实例；
+```
+![Ribbon负载均衡器原理](assert/Ribbon负载均衡器原理.png)
+## Ribbon 3种配置方式
+```text
+1、application.yml中直接配置；2、@RibbonClient；3、ribbon与eureka集成使用；
  ```
-服务名.实例列表：service-by-properties.listOfServers=
-http://www.csdn.net , http://www.baidu.com , http://www.dongnaoedu.com，表示service-by-properties
-服务有 3个实例
-
-service-by-annotation服务的实例在ServiceByAnnontationConfiguration中；
-③application.yml配置文件中：ribbon.eureka.enabled=true，表示开启 ribbon与eureka集成；
-举例：
-创建 maven子模块 lesson-4-eureka服务作为 eureka服务端，并启动；
-创建 maven子模块 lesson-4-ribbon服务作为 eureka客户端 获取服务，pom.xml里面引入s-c-s-ribbon
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-ribbon</artifactId>
-</dependency>
-启动类 RibbonSampleApplication如下：
-配置文件 application.yml 详情见注释，里面包括 ①③配置形式；
-②配置形式通过在启动类RibbonSampleApplication上加注解，如下：
-@RibbonClients(value = {
-		@RibbonClient(name = "service-by-annotation", configuration = ServiceByAnnontationConfiguration.class) })
-该注解表示 service-by-annotation的负载均衡器，负载均衡的配置在ServiceByAnnontationConfiguration
-里面，该类如下，注意，这个类创建spring容器中的实例对象，但是没有加 @Configuration注解，表示其创建实例
-对象 存到 子容器：
-
-
 ```yaml
-# 1、application.yml中直接配置；
+# 1、application.yml中直接配置 ribbon；
 service-by-properties:            # 请求 service-by-properties服务时，从下面服务列表找
   listOfServers: http://www.csdn.net,http://www.baidu.com,http://www.dongnaoedu.com # 服务实例列表
   MaxAutoRetriesNextServer: 0           # 这个负载均衡器不做重试
@@ -44,7 +26,7 @@ service-by-properties:            # 请求 service-by-properties服务时，从�
     NIWSServerListClassName: com.netflix.loadbalancer.ConfigurationBasedServerList  # 设置它的服务实例信息来自配置文件, 如果不设置NIWSServerListClassName就会去euereka里面找
 ```
 ```java
-//启动类使用@RibbonClients注解：
+//启动类使用@RibbonClients注解，service-by-annotation表示服务名
 @RibbonClients(value = {@RibbonClient(name = "service-by-annotation", configuration = ServiceByAnnontationConfiguration.class) })
 public class RibbonSampleApplication {
     //...
@@ -91,12 +73,102 @@ ribbon:
   MaxAutoRetriesNextServer: 3     # 重试期间，实例切换次数	 比如：100个实例，我只会在四个实例上面去重试
   MaxAutoRetries: 2               # 当前实例重试次数
 ```
-ribbon 3种使用方式，在 way包：
-①TestLoadBalancerClientController类，通过loadbalancerClient对象，选择服务的一个实例；
-ServiceInstance serviceInstance = loadbalancerClient.choose("service-by-properties")
-②TestResttemplateController类，通过restTemplate对象，选择服务的一个实例；
-String body = restTemplate.getForObject("http://service-by-properties/", String.class);
-③TestFeignController类
 
-启动 lesson-4-ribbon服务，该服务作为 eureka客户端调用者，去调用服务实例，该例中服务为service-by-properties，
-服务实例分别为：http://www.csdn.net , http://www.baidu.com , http://www.dongnaoedu.com
+## Ribbon 3种使用方式
+```text
+见 way包：
+1、TestLoadBalancerClientController类，通过LoadbalancerClient对象，选择服务的一个实例，ServiceInstance serviceInstance = loadbalancerClient.choose("service-by-properties")
+2、TestResttemplateController类，通过restTemplate对象，选择服务的一个实例，String body = restTemplate.getForObject("http://service-by-properties/", String.class);
+3、TestFeignController类
+```
+
+## Ribbon 源码分析
+```text
+springboot启动时，会扫描spring-cloud-netflix-core包 META-INF/spring.factories，内容如下：
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  org.springframework.cloud.netflix.ribbon.RibbonAutoConfiguration    # Ribbon初始化
+spring.factories中这样定义目的：springboot启动时会 自动装配 以EnableAutoConfiguration为key的value，因此EurekaServerAutoConfiguration会被 实例化到当前IOC容器
+```
+
+```java
+/**1、LoadbalancerClient实现负载均衡
+* 
+* */
+@Configuration
+@RibbonClients
+public class RibbonAutoConfiguration {
+   	@Bean
+   	@ConditionalOnMissingBean(LoadBalancerClient.class)
+   	public LoadBalancerClient loadBalancerClient() {        
+   		return new RibbonLoadBalancerClient(springClientFactory());     //实例化LoadbalancerClient到 IOC容器；跟
+   	}
+}
+public class RibbonLoadBalancerClient implements LoadBalancerClient {
+    @Override
+    public ServiceInstance choose(String serviceId) {   //一个服务名 有多个实例，选择其中一个 实例
+        Server server = getServer(serviceId);   //跟getServer()
+        if (server == null) {
+            return null;
+        }
+        return new RibbonServer(serviceId, server, isSecure(server, serviceId),serverIntrospector(serviceId).getMetadata(server));
+    }
+    protected Server getServer(String serviceId) {
+        return getServer(getLoadBalancer(serviceId));       //根据服务名，获取 该服务配置的 负载均衡器，用负载均衡器 选择一个 服务的一个实例；跟 getLoadBalancer(serviceId)
+    }
+    protected ILoadBalancer getLoadBalancer(String serviceId) {     //每个服务 都有一个 负载均衡器ILoadBalancer，在RibbonClientConfiguration中初始化
+        return this.clientFactory.getLoadBalancer(serviceId);
+    }
+    protected Server getServer(ILoadBalancer loadBalancer) {        //跟 getServer()
+        if (loadBalancer == null) {return null;}
+        return loadBalancer.chooseServer("default");                //跟 chooseServer("default")
+    }
+}
+@Configuration
+@EnableConfigurationProperties
+public class RibbonClientConfiguration {
+    @Bean
+	@ConditionalOnMissingBean
+	public ILoadBalancer ribbonLoadBalancer(IClientConfig config,ServerList<Server> serverList, ServerListFilter<Server> serverListFilter,IRule rule, IPing ping, ServerListUpdater serverListUpdater) {
+		if (this.propertiesFactory.isSet(ILoadBalancer.class, name)) {
+			return this.propertiesFactory.get(ILoadBalancer.class, config, name);
+		}
+		return new ZoneAwareLoadBalancer<>(config, rule, ping, serverList,serverListFilter, serverListUpdater);
+	}
+}
+public class BaseLoadBalancer extends AbstractLoadBalancer implements PrimeConnections.PrimeConnectionListener, IClientConfigAware {
+    public Server chooseServer(Object key) {
+        if (counter == null) {
+            counter = createCounter();
+        }
+        counter.increment();
+        if (rule == null) {
+            return null;
+        } else {
+            try {
+                return rule.choose(key);        //根据负载策略 去选择
+            } catch (Exception e) {}
+        }
+    }
+    @Override
+    public List<Server> getAllServers() {                       //  获取服务实例来源
+        return Collections.unmodifiableList(allServerList);
+    }
+    public void setServersList(List lsrv) {                     //  将服务实例设置进来，调用该方法的位置如下
+        //...
+    }
+}
+@Configuration
+public class RibbonClientConfiguration {
+	@Bean
+	@ConditionalOnMissingBean
+	public ServerList<Server> ribbonServerList(IClientConfig config) {      // 设置服务实例
+		if (this.propertiesFactory.isSet(ServerList.class, name)) {
+			return this.propertiesFactory.get(ServerList.class, config, name);
+		}
+		// ConfigurationBasedServerList 父类 AbstractServerList还有一个子类 DiscoveryEnabledNIWSServerList，表示通过 eureka获取服务实例信息
+		ConfigurationBasedServerList serverList = new ConfigurationBasedServerList();
+		serverList.initWithNiwsConfig(config);
+		return serverList;
+	}
+}
+```
