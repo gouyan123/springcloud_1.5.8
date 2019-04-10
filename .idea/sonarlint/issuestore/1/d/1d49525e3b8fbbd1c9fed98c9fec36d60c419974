@@ -1,0 +1,16 @@
+
+osquid:UselessImportCheck
+"?Remove this unused import 'java.util.concurrent.ThreadFactory'.(ã’Ÿºúÿÿÿÿ8È×À»-
+Isquid:S1481"&Remove this unused "r" local variable.(‹æÀ±øÿÿÿÿ8óˆÔ½-
+Nsquid:S1481"+Remove this unused "period" local variable.(üöß‹ùÿÿÿÿ8«šÀ¾-
+Xsquid:S1854"5Remove this useless assignment to local variable "r".(‹æÀ±øÿÿÿÿ8óˆÔ½-
+Fsquid:S1148'"#Use a logger to log this exception.(€ÉÔ…ıÿÿÿÿ8±£×½-
+V
+squid:S1060"9Replace this use of System.out or System.err by a logger.(£ÆÏÁ8ç½¾-
+nsquid:CommentedOutCodeLine"<This block of commented-out lines of code should be removed.(áíüÈùÿÿÿÿ8Ïğ€¾-
+[
+squid:S106"9Replace this use of System.out or System.err by a logger.(Ê×ïıÿÿÿÿ8Şô°»-
+nsquid:CommentedOutCodeLine"<This block of commented-out lines of code should be removed.(ÔÇ¦—ıÿÿÿÿ8œú¼½-
+dsquid:S2142&"FEither re-interrupt this method or rethrow the "InterruptedException".(ä ¹€8±£×½-
+Osquid:S1602",Remove useless curly braces around statement(‹æÀ±øÿÿÿÿ8Şô°»-
+~squid:UselessImportCheck"SRemove this unused import 'com.google.common.util.concurrent.ThreadFactoryBuilder'.(Òä˜¥8ëşõ½-

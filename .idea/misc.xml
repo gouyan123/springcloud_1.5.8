@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="FrameworkDetectionExcludesConfiguration">
+    <file type="web" url="file://$PROJECT_DIR$/lesson-1-sms-webmvc" />
+    <file type="web" url="file://$PROJECT_DIR$/lesson-2-sms-webmvc" />
+  </component>
+  <component name="JavaScriptSettings">
+    <option name="languageLevel" value="ES6" />
+  </component>
+  <component name="MavenProjectsManager">
+    <option name="originalFiles">
+      <list>
+        <option value="$PROJECT_DIR$/lesson-4-ribbon/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-3-eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-3-feign/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-3-sms-interface/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-1-eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-1-sms-interface/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-1-sms-webmvc/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-1-website/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-2-config-server/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-2-eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-2-eureka-backup/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-2-sms-sys/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-2-sms-webmvc/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-4-eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-4-sms-interface/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-5-eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-5-hystrix/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-5-sms-interface/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-5-website/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-6-config-server/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-6-eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-6-sms-interface/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-6-uaa-interface/pom.xml" />
+        <option value="$PROJECT_DIR$/lesson-6-zuul-server/pom.xml" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" default="false" project-jdk-name="1.8" project-jdk-type="JavaSDK" />
+</project>

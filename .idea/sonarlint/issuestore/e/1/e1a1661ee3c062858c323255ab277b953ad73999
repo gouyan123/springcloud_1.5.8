@@ -1,0 +1,6 @@
+
+]squid:S4488"HReplace "@RequestMapping(method = RequestMethod.GET)" with "@GetMapping"(Ô˜î’
+_squid:S4488"JReplace "@RequestMapping(method = RequestMethod.POST)" with "@PostMapping"(¡‘«›
+\squid:S4488"HReplace "@RequestMapping(method = RequestMethod.GET)" with "@GetMapping"(Ö²ùZ
+]squid:S4488"HReplace "@RequestMapping(method = RequestMethod.GET)" with "@GetMapping"(ÿ’Å¨
+\squid:S4488"HReplace "@RequestMapping(method = RequestMethod.GET)" with "@GetMapping"(îì»w

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/lesson-1-eureka/lesson-1-eureka.iml" filepath="$PROJECT_DIR$/lesson-1-eureka/lesson-1-eureka.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-1-sms-interface/lesson-1-sms-interface.iml" filepath="$PROJECT_DIR$/lesson-1-sms-interface/lesson-1-sms-interface.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-1-sms-webmvc/lesson-1-sms-webmvc.iml" filepath="$PROJECT_DIR$/lesson-1-sms-webmvc/lesson-1-sms-webmvc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-1-website/lesson-1-website.iml" filepath="$PROJECT_DIR$/lesson-1-website/lesson-1-website.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-2-config-server/lesson-2-config-server.iml" filepath="$PROJECT_DIR$/lesson-2-config-server/lesson-2-config-server.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-2-eureka/lesson-2-eureka.iml" filepath="$PROJECT_DIR$/lesson-2-eureka/lesson-2-eureka.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-2-eureka-backup/lesson-2-eureka-backup.iml" filepath="$PROJECT_DIR$/lesson-2-eureka-backup/lesson-2-eureka-backup.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-2-sms-sys/lesson-2-sms-sys.iml" filepath="$PROJECT_DIR$/lesson-2-sms-sys/lesson-2-sms-sys.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-2-sms-webmvc/lesson-2-sms-webmvc.iml" filepath="$PROJECT_DIR$/lesson-2-sms-webmvc/lesson-2-sms-webmvc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-3-eureka/lesson-3-eureka.iml" filepath="$PROJECT_DIR$/lesson-3-eureka/lesson-3-eureka.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-3-feign/lesson-3-feign.iml" filepath="$PROJECT_DIR$/lesson-3-feign/lesson-3-feign.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-3-sms-interface/lesson-3-sms-interface.iml" filepath="$PROJECT_DIR$/lesson-3-sms-interface/lesson-3-sms-interface.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-4-eureka/lesson-4-eureka.iml" filepath="$PROJECT_DIR$/lesson-4-eureka/lesson-4-eureka.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-4-ribbon/lesson-4-ribbon.iml" filepath="$PROJECT_DIR$/lesson-4-ribbon/lesson-4-ribbon.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-4-sms-interface/lesson-4-sms-interface.iml" filepath="$PROJECT_DIR$/lesson-4-sms-interface/lesson-4-sms-interface.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-5-eureka/lesson-5-eureka.iml" filepath="$PROJECT_DIR$/lesson-5-eureka/lesson-5-eureka.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-5-hystrix/lesson-5-hystrix.iml" filepath="$PROJECT_DIR$/lesson-5-hystrix/lesson-5-hystrix.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-5-sms-interface/lesson-5-sms-interface.iml" filepath="$PROJECT_DIR$/lesson-5-sms-interface/lesson-5-sms-interface.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-5-website/lesson-5-website.iml" filepath="$PROJECT_DIR$/lesson-5-website/lesson-5-website.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-6-config-server/lesson-6-config-server.iml" filepath="$PROJECT_DIR$/lesson-6-config-server/lesson-6-config-server.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-6-eureka/lesson-6-eureka.iml" filepath="$PROJECT_DIR$/lesson-6-eureka/lesson-6-eureka.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-6-sms-interface/lesson-6-sms-interface.iml" filepath="$PROJECT_DIR$/lesson-6-sms-interface/lesson-6-sms-interface.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-6-uaa-interface/lesson-6-uaa-interface.iml" filepath="$PROJECT_DIR$/lesson-6-uaa-interface/lesson-6-uaa-interface.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lesson-6-zuul-server/lesson-6-zuul-server.iml" filepath="$PROJECT_DIR$/lesson-6-zuul-server/lesson-6-zuul-server.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/springcloud_1.5.8.iml" filepath="$PROJECT_DIR$/.idea/springcloud_1.5.8.iml" />
+    </modules>
+  </component>
+</project>

@@ -1,0 +1,10 @@
+
+¢%squid:RedundantThrowsDeclarationCheck "lRemove the declaration of thrown exception 'java.lang.Exception', as it cannot be thrown from method's body.(¦€ÜÓùÿÿÿÿ
+Gsquid:S1068"0Remove this unused "retryHandler" private field.(ëßýÿ
+T
+squid:S106@"9Replace this use of System.out or System.err by a logger.(šºï»úÿÿÿÿ
+O
+squid:S106C"9Replace this use of System.out or System.err by a logger.(ýÙ¦­
+T
+squid:S106D"9Replace this use of System.out or System.err by a logger.(°”ä¤ýÿÿÿÿ
+csquid:S00112 "FDefine and throw a dedicated exception instead of using a generic one.(¦€ÜÓùÿÿÿÿ
