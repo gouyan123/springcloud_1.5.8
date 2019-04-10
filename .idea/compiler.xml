@@ -35,13 +35,13 @@
     <bytecodeTargetLevel>
       <module name="lesson-1-eureka" target="8" />
       <module name="lesson-1-sms-interface" target="1.6" />
-      <module name="lesson-1-sms-webmvc" target="1.5" />
+      <module name="lesson-1-sms-webmvc" target="1.7" />
       <module name="lesson-1-website" target="1.6" />
       <module name="lesson-2-config-server" target="1.6" />
       <module name="lesson-2-eureka" target="1.6" />
       <module name="lesson-2-eureka-backup" target="1.6" />
       <module name="lesson-2-sms-sys" target="1.6" />
-      <module name="lesson-2-sms-webmvc" target="1.5" />
+      <module name="lesson-2-sms-webmvc" target="1.7" />
       <module name="lesson-3-eureka" target="1.6" />
       <module name="lesson-3-feign" target="1.6" />
       <module name="lesson-3-sms-interface" target="1.6" />
