@@ -21,10 +21,10 @@ public class RibbonSampleApplication {
 		new SpringApplicationBuilder(RibbonSampleApplication.class).web(true).run(args);
 	}
 
-	// 这里定义 可以覆盖所有的
-	// @Bean
-	// public IRule ribbonRule() {
-	// return new RandomRule();
-	// }
+//	 这里定义 可以覆盖所有的
+//	 @Bean
+//	 public IRule ribbonRule() {
+//	 return new RandomRule();
+//	 }
 
 }

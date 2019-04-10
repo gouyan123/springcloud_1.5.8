@@ -11,8 +11,7 @@ import com.netflix.loadbalancer.ServerList;
 
 // 注解的方式，对应RibbonSampleApplication中@RibbonClients
 public class ServiceByAnnontationConfiguration {
-	// 实例源
-	// service-by-annotation
+	// service-by-annotation服务的实例源
 	@Bean
 	public ServerList<Server> ribbonServerList() {
 		// 实例列表

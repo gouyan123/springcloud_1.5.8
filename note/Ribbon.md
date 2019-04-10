@@ -1,18 +1,46 @@
-# Ribbon 客户端负载均衡
+# Ribbon 客户端负载均衡(注意：nginx属于 服务端负载均衡，可以一起使用，不冲突)
 ```text
-客户端负载均衡：
+Ribbon作用简介：
 一个服务，多个实例，如何选择调用实例？调用实例之前，先去eureka服务端 获取该服务的所有实例，根据Ribbon的负载均衡策略，选择一个合适的实例，然后发起请求调用该实例；
 ```
 ![Ribbon流程图](assert/Ribbon流程图.png)
 ## Ribbon 原理
 ```text
-每个服务 都有一个独立的 负载均衡器 ILoadBalancer，ILoadBalancer = 该服务的实例列表 + 负载均衡策略；
+每个服务 都有一个独立的 负载均衡器 ILoadBalancer，ILoadBalancer = 该服务的实例列表 + 负载均衡策略 IRule；
 List<Server>存 该服务 服务实例列表，数据源于 配置信息ConfigurationBasedServerList 或者 EurekaRibbonClientConfiguration.ribbonServerList；
 chooseServer(Object key)：根据负载均衡策略 从多个 服务实例中选择一个合适的实例；
 ```
 ![Ribbon负载均衡器原理](assert/Ribbon负载均衡器原理.png)
+```java
+@SpringBootApplication
+@EnableEurekaClient
+@EnableFeignClients
+public class RibbonSampleApplication {
+
+	public static void main(String[] args) {
+		new SpringApplicationBuilder(RibbonSampleApplication.class).web(true).run(args);
+	}
+
+    /** 配置 负载均衡器 ILoadBalancer 的负载均衡规则 IRule
+    * @SpringBootApplication 中含有 @Configuration，@Configuration + @Bean 会实例化到 父容器；不加@Configuration，只用@Bean会实例化到 子容器
+    * 子容器可以获取到父容器里面的对象，父容器不能获取子容器里面的对象
+    * */
+	 @Bean
+	 public IRule ribbonRule() {
+	    return new RandomRule();
+	 }
+}
+```
+```text
+Spring父子容器：每个服务 都有一个独立的 负载均衡器 ILoadBalancer，各个负载均衡器ILoadBalancer 怎么样独立 自己的配置呢？ 答案：Spring有很多子容器，每个子容器保存一个服务的负载均衡器配置；
+```
+![Spring父子容器-Ribbon](assert/Spring父子容器_Ribbon.png)
 ## Ribbon 3种配置方式
 
+```text
+1、application.yml中直接配置；2、@RibbonClient；3、ribbon与eureka集成使用，ribbon会自动创建负载均衡器，不需要额外配置；
+ ```
+ 
 ```yaml
 # 3、ribbon通过eureka进行负载均衡；重点：重试方案；
 ribbon:
@@ -28,9 +56,6 @@ ribbon:
   
 ```
 
-```text
-1、application.yml中直接配置；2、@RibbonClient；3、ribbon与eureka集成使用，ribbon会自动创建负载均衡器，不需要额外配置；
- ```
 ```yaml
 # 1、application.yml中直接配置 负载均衡器；
 service-by-properties:            # 请求 service-by-properties服务时，从下面服务列表找
@@ -89,19 +114,23 @@ org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
   org.springframework.cloud.netflix.ribbon.RibbonAutoConfiguration    # Ribbon初始化
 spring.factories中这样定义目的：springboot启动时会 自动装配 以EnableAutoConfiguration为key的value，因此EurekaServerAutoConfiguration会被 实例化到当前IOC容器
 ```
-
+### Ribbon 源码分析：RibbonLoadBalancerClient 实现 负载均衡原理
 ```java
-/**1、LoadbalancerClient实现负载均衡
-* 
-* */
+/**实例化 spring-cloud-netflix-core包中类到 当前 IOC容器*/
 @Configuration
 @RibbonClients
 public class RibbonAutoConfiguration {
    	@Bean
    	@ConditionalOnMissingBean(LoadBalancerClient.class)
    	public LoadBalancerClient loadBalancerClient() {        
-   		return new RibbonLoadBalancerClient(springClientFactory());     //实例化LoadbalancerClient到 IOC容器；跟
+   		return new RibbonLoadBalancerClient(springClientFactory());     //跟；实例化LoadbalancerClient到 IOC容器
    	}
+   	@Bean
+    public SpringClientFactory springClientFactory() {                  //SpringClientFactory负责创建 和 查找 子容器
+        SpringClientFactory factory = new SpringClientFactory();
+        factory.setConfigurations(this.configurations);
+        return factory;
+    }
 }
 public class RibbonLoadBalancerClient implements LoadBalancerClient {
     @Override
@@ -120,7 +149,7 @@ public class RibbonLoadBalancerClient implements LoadBalancerClient {
     }
     protected Server getServer(ILoadBalancer loadBalancer) {        //跟 getServer()
         if (loadBalancer == null) {return null;}
-        return loadBalancer.chooseServer("default");                //跟 chooseServer("default")
+        return loadBalancer.chooseServer("default");                //跟 chooseServer("default")，loadBalancer通过下面的ribbonLoadBalancer()方法 实例化到IOC容器
     }
 }
 @Configuration
@@ -135,6 +164,7 @@ public class RibbonClientConfiguration {
 		return new ZoneAwareLoadBalancer<>(config, rule, ping, serverList,serverListFilter, serverListUpdater);
 	}
 }
+/**BaseLoadBalancer是 ILoadBalancer接口的一个默认实现类*/
 public class BaseLoadBalancer extends AbstractLoadBalancer implements PrimeConnections.PrimeConnectionListener, IClientConfigAware {
     public Server chooseServer(Object key) {
         if (counter == null) {
@@ -145,15 +175,15 @@ public class BaseLoadBalancer extends AbstractLoadBalancer implements PrimeConne
             return null;
         } else {
             try {
-                return rule.choose(key);        //根据负载策略 去选择
+                return rule.choose(key);        //持有 IRule接口对象，根据负载策略 去选择服务实例
             } catch (Exception e) {}
         }
     }
     @Override
-    public List<Server> getAllServers() {                       //  获取服务实例来源
+    public List<Server> getAllServers() {                       //  获取服务实例列表
         return Collections.unmodifiableList(allServerList);
     }
-    public void setServersList(List lsrv) {                     //  将服务实例设置进来，调用该方法的位置如下
+    public void setServersList(List lsrv) {                     //  将服务实例设置进来，lsrv由ribbonServerList()实例化到 IOC容器
         //...
     }
 }
@@ -170,5 +200,119 @@ public class RibbonClientConfiguration {
 		serverList.initWithNiwsConfig(config);
 		return serverList;
 	}
+}
+/**使用 SpringClientFactory创建 子容器并 根据名称查找子容器*/
+public class RibbonLoadBalancerClient implements LoadBalancerClient {
+    public RibbonLoadBalancerClient(SpringClientFactory clientFactory) {
+        this.clientFactory = clientFactory;
+    }
+    @Override
+    public URI reconstructURI(ServiceInstance instance, URI original) {
+        String serviceId = instance.getServiceId();     //serviceId为服务名
+        RibbonLoadBalancerContext context = this.clientFactory.getLoadBalancerContext(serviceId);   //跟；通过 服务名查找 子容器
+        IClientConfig clientConfig = clientFactory.getClientConfig(serviceId);      //根据服务名称 获取 该服务的负载均衡器配置信息
+    }
+}
+public class SpringClientFactory extends NamedContextFactory<RibbonClientSpecification> {
+	public RibbonLoadBalancerContext getLoadBalancerContext(String serviceId) {
+		return getInstance(serviceId, RibbonLoadBalancerContext.class);     //跟
+	}
+	@Override
+    public <C> C getInstance(String name, Class<C> type) {
+        C instance = super.getInstance(name, type);                     //super.getInstance(name, type)
+        //...
+    }
+}
+public abstract class NamedContextFactory<C extends NamedContextFactory.Specification> implements DisposableBean, ApplicationContextAware {
+    public <T> T getInstance(String name, Class<T> type) {
+		AnnotationConfigApplicationContext context = getContext(name);          //跟getContext(name)
+		//...
+	}
+	protected AnnotationConfigApplicationContext getContext(String name) {
+        if (!this.contexts.containsKey(name)) {
+            synchronized (this.contexts) {
+                if (!this.contexts.containsKey(name)) {
+                    this.contexts.put(name, createContext(name));       //跟createContext(name)
+                }
+            }
+        }
+        return this.contexts.get(name);
+    }
+    protected AnnotationConfigApplicationContext createContext(String name) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();      //创建一个上下文
+        if (this.configurations.containsKey(name)) {
+            for (Class<?> configuration : this.configurations.get(name)
+                    .getConfiguration()) {
+                context.register(configuration);        //向上下文 注册 配置信息
+            }
+        }
+        //...
+        context.register(PropertyPlaceholderAutoConfiguration.class, this.defaultConfigType);
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(this.propertySourceName, Collections.<String, Object> singletonMap(this.propertyName, name)));
+        if (this.parent != null) {
+            context.setParent(this.parent);             //设置 父上下文 ApplicationContext
+        }
+        context.refresh();                              //所有上下文必须调用 refresh()，refresh()刷新后，上下文才可以使用
+        return context;
+    }
+}
+```
+
+### Ribbon 源码分析：RestTemplate 实现 负载均衡原理
+```java
+/**RestTemplate 加 @LoadBalanced注解 给RestTemplate调用增加负载均衡功能*/
+@RestController
+@RequestMapping("/resttemplate")
+@Configuration
+public class TestResttemplateController {
+
+	@Bean
+	@LoadBalanced	/**@Bean表示将RestTemplate 实例化到IOC容器，+@LoadBalanced表示 将IOC容器中RestTemplate实例 加入一个List集合*/
+	RestTemplate RestTemplate() {
+		SimpleClientHttpRequestFactory simpleClientHttpRequestFactory = new SimpleClientHttpRequestFactory();
+		simpleClientHttpRequestFactory.setReadTimeout(2000);
+		simpleClientHttpRequestFactory.setConnectTimeout(2000);
+		return new RestTemplate(simpleClientHttpRequestFactory);
+	}
+}
+/**LoadBalancerAutoConfiguration在spring.factories中key为 EnableAutoConfiguration*/
+@Configuration
+@ConditionalOnClass(RestTemplate.class)
+@ConditionalOnBean(LoadBalancerClient.class)
+@EnableConfigurationProperties(LoadBalancerRetryProperties.class)
+public class LoadBalancerAutoConfiguration {
+
+	@LoadBalanced                   /**@Autowired 表示注入RestTemplate实例，+@LoadBalanced 表示 注入 IOC容器中 RestTemplate的List集合*/
+	@Autowired(required = false)
+	private List<RestTemplate> restTemplates = Collections.emptyList();
+	
+}
+```
+
+### Ribbon 源码分析：FeignClient 实现 负载均衡原理
+```java
+@ConditionalOnClass({ ILoadBalancer.class, Feign.class })
+@Configuration
+@AutoConfigureBefore(FeignAutoConfiguration.class)
+public class FeignRibbonClientAutoConfiguration {
+    @Bean
+    @ConditionalOnMissingBean
+    public Client feignClient(CachingSpringLoadBalancerFactory cachingFactory,SpringClientFactory clientFactory) {
+        return new LoadBalancerFeignClient(new Client.Default(null, null),cachingFactory, clientFactory);
+    }
+}
+class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,ApplicationContextAware {
+    @Override
+    public Object getObject() throws Exception {
+        if (!StringUtils.hasText(this.url)) {
+            return loadBalance(builder, context, new HardCodedTarget<>(this.type,this.name, url));      //跟loadBalance()
+        }    		
+    }
+    protected <T> T loadBalance(Feign.Builder builder, FeignContext context,HardCodedTarget<T> target) {
+        Client client = getOptional(context, Client.class);     //跟getOptional(context, Client.class)
+    }
+    protected <T> T getOptional(FeignContext context, Class<T> type) {
+        return context.getInstance(this.name, type);            //在子容器找到 对应的 FeignClient
+    }
 }
 ```
