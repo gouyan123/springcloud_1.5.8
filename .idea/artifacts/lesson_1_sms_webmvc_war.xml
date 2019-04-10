@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="war" name="lesson-1-sms-webmvc:war">
+    <output-path>$PROJECT_DIR$/lesson-1-sms-webmvc/target</output-path>
+    <root id="archive" name="lesson-1-sms-webmvc-1.0.0.war">
+      <element id="artifact" artifact-name="lesson-1-sms-webmvc:war exploded" />
+    </root>
+  </artifact>
+</component>

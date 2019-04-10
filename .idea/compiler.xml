@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="lesson-1-eureka" />
+        <module name="lesson-1-sms-interface" />
+        <module name="lesson-1-sms-webmvc" />
+        <module name="lesson-1-website" />
+        <module name="lesson-2-config-server" />
+        <module name="lesson-2-eureka" />
+        <module name="lesson-2-eureka-backup" />
+        <module name="lesson-2-sms-sys" />
+        <module name="lesson-2-sms-webmvc" />
+        <module name="lesson-3-eureka" />
+        <module name="lesson-3-feign" />
+        <module name="lesson-3-sms-interface" />
+        <module name="lesson-4-eureka" />
+        <module name="lesson-4-ribbon" />
+        <module name="lesson-4-sms-interface" />
+        <module name="lesson-5-eureka" />
+        <module name="lesson-5-hystrix" />
+        <module name="lesson-5-sms-interface" />
+        <module name="lesson-5-website" />
+        <module name="lesson-6-config-server" />
+        <module name="lesson-6-eureka" />
+        <module name="lesson-6-sms-interface" />
+        <module name="lesson-6-uaa-interface" />
+        <module name="lesson-6-zuul-server" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="lesson-1-eureka" target="8" />
+      <module name="lesson-1-sms-interface" target="1.6" />
+      <module name="lesson-1-sms-webmvc" target="1.5" />
+      <module name="lesson-1-website" target="1.6" />
+      <module name="lesson-2-config-server" target="1.6" />
+      <module name="lesson-2-eureka" target="1.6" />
+      <module name="lesson-2-eureka-backup" target="1.6" />
+      <module name="lesson-2-sms-sys" target="1.6" />
+      <module name="lesson-2-sms-webmvc" target="1.5" />
+      <module name="lesson-3-eureka" target="1.6" />
+      <module name="lesson-3-feign" target="1.6" />
+      <module name="lesson-3-sms-interface" target="1.6" />
+      <module name="lesson-4-eureka" target="1.6" />
+      <module name="lesson-4-ribbon" target="1.6" />
+      <module name="lesson-4-sms-interface" target="1.6" />
+      <module name="lesson-5-eureka" target="1.6" />
+      <module name="lesson-5-hystrix" target="1.6" />
+      <module name="lesson-5-sms-interface" target="1.6" />
+      <module name="lesson-5-website" target="1.6" />
+      <module name="lesson-6-config-server" target="1.6" />
+      <module name="lesson-6-eureka" target="1.6" />
+      <module name="lesson-6-sms-interface" target="1.6" />
+      <module name="lesson-6-uaa-interface" target="1.6" />
+      <module name="lesson-6-zuul-server" target="1.6" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

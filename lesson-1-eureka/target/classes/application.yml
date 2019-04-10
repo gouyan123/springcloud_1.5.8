@@ -1,16 +1,14 @@
 server:
   port: 8761
-
+spring:
+  application:
+    name: eureka-server
 # 配置eureka
 eureka:
-  instance:
-    ######################### 续约 心跳 下线 #########################
-    # Eureka服务器在接收到实例最后一次发出的心跳后，需要等待多久才可以将此实例删除，默认为90s
-    lease-expiration-duration-in-seconds: 30
   client:
     registerWithEureka: true
-#    serviceUrl:
-#      defaultZone: http://127.0.0.1:8761/eureka/
+    serviceUrl:
+      defaultZone: http://127.0.0.1:8761/eureka/
     ######################### 续约 心跳 下线 #########################
     # Eureka Server端服务实例租约过期定时任务执行频率，默认60s
     eviction-interval-timer-in-ms: 30
