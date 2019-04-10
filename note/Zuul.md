@@ -1,40 +1,42 @@
-----------------服务网关 Zuul-------------------------------------------------------------
+# 服务网关 Zuul
+```text
+Zuul基本概念：
 什么是API 网关？
-服务实例接口不对外开放，外部调用springcloud中的服务，需要通过 统一入口 网关来映射；
-网关工作原理：网关解析uri请求，找到相匹配的服务，然后发起调用，取得结果后，将结果返回给调用者[类似Ngix反向代理]；
-
+    服务实例接口不对外开放，外部调用springcloud中的服务，需要通过 统一入口 网关来映射；
+网关工作原理：
+    网关解析uri请求，找到相匹配的服务，然后发起调用，取得结果后，将结果返回给调用者[类似Ngix反向代理]；
+    zuulServlet 受理用户请求；
+    zuulFilter 做路由定位，发起代理请求，返回结果；
 为什么需要 网关？
-降低 微服务系统复杂性：网关给外部http请求 统一入口，使外部http请求与微服务内部服务实例解耦；
+    降低 微服务系统复杂性：网关给外部http请求 统一入口，使外部http请求与微服务内部服务实例解耦；
+功能增强：
+    附加如 权限校验，限速等机制；
+路由表：
+    路由表就是在 注册表 上面增加加一列 外部path，当外部请求 http://网关ip:网关port/path 时，path映射到 服务A，从而调用服务A下面的接口
+    服务名         instanceid                  ip                  port        外部path
+    A              A192.168.25.100:8761       192.168.25.100       8761        a
+    A              A192.168.25.101:8762       192.168.25.101       8762        a
+    A              A192.168.25.102:8763       192.168.25.102       8763        a
+路由定位器：
+    将用户请求的path 与 路由表匹配，得到一个路由：外部path →映射到→ 服务名；
+```
 
-功能增强：附加如 权限校验，限速等机制；
-
-重要概念：
-路由表：url 与 服务 的映射关系；
-路由定位器：将用户请求的url 与 路由表匹配，得到一个路由；
-
-zuulServlet 受理用户请求；
-zuulFilter 做路由定位，发起代理请求，返回结果；
-
-举例如下：
-创建 maven子模块 lesson-6-eureka服务作为 eureka服务端，并启动；
-创建 maven子模块 lesson-6-config-server，作为 config服务端，并启动；
-创建 maven子模块 lesson-6-sms-interface服务作为 eureka客户端[向eureka注册自己的服务,向eureka获取服务]，此处角色 向eureka服务端注册服务，并启动；
-发送get请求 http://localhost:9002/sms 测试 短信服务lesson-6-sms-interface；
-
-短信服务lesson-6-sms-interface 不应该对外暴露接口，这个服务接口属于内网，因此需要使用网关代理；
-创建 maven子模块 lesson-6-zuul-server服务作为 eureka客户端[向eureka注册自己的服务,向eureka获取服务]，此处角色 向eureka服务端获取服务，并启动；
-启动类使用@EnableZuulProxy，开启 网关zuul，使用@EnableCircuitBreaker 开启熔断，使用@EnableEurekaClient，开启eureka客户端；
-配置文件 lesson-6-zuul-server.yml在config服务端 lesson-6-config-server的resoureces路径下：
-
-2.怎么配置一个代理路由？
-zuul的配置有 3种方式：
+```text
+服务准备：
+启动 lesson-6-eureka，lesson-6-config-server作为 config服务端，lesson-6-sms-interface，发送get请求 http://localhost:9002/sms 测试 短信服务lesson-6-sms-interface，该服务不应该对外暴露接口，这个服务接口
+属于内网，因此需要使用网关代理；
+启动 lesson-6-zuul-server作为网关，启动类使用@EnableZuulProxy表示开启 网关zuul，配置文件 lesson-6-zuul-server.yml在config服务端 lesson-6-config-server的resoureces路径下；
+```
+```text
+2、zuul配置代理路由的 3种方式：
 ① 普通url请求路由配置；反向代理模式：不直接访问一个网址，而是通过一个服务器去访问；为静态路由：   路由服务端口
-② eureka服务化的路由会自动配置（重点），为动态路由，不需要在配置文件中指定，例如http://localhost:8765/tony_api/lesson-6-sms-interface/sms，可以直接访问到
-sms服务的 /sms接口，但是lesson-6-sms-interface服务是对内的，网关地址里面也不能写，需要配置 忽略ignored-services:
-③ ribbon路由配置，为静态路由：
+② eureka动态路由，不需要在配置文件中指定，例如http://localhost:8765/tony_api/lesson-6-sms-interface/sms，外部请求lesson-6-sms-interface/sms 可以直接访问到lesson-6-sms-interface服务的 /sms接口；
+③ ribbon路由配置，为静态路由；
+```
 
-
-①普通url路由配置，在lesson-6-zuul-server.yml文件中，将外部请求path 路由到 内部实例url；支配routes还不够，还要配路由过期时间；
+```yaml
+# ①普通url路由配置，在lesson-6-zuul-server.yml文件中，将外部请求path 路由到 内部实例url；只配routes还不够，还要配路由过期时间；
+# 测试静态配置，访问zuul服务，发送get请求 http://localhost:8765/tony_api/oschina
 zuul:
   host:                             # 代理普通http请求的超时时间
     socket-timeout-millis: 2000
@@ -45,29 +47,28 @@ zuul:
     route1:                         # 路由key，将外部path 路由到 内部实例url；路由key名称自己随便定义；
       path: /oschina/**             # 外部path
       url: http://www.baidu.com     # 内部服务url
-
-测试静态配置，访问zuul服务，发送get请求 http://localhost:8765/tony_api/oschina
-②动态路由：不需要在 配置文件中配置，通过eureka直接路由，如果某个服务想屏蔽外部path路由，可以配置 ignored-services；
+```
+```yaml
+# ②动态路由：不需要在 配置文件中配置，通过eureka直接路由，如果某个服务想屏蔽外部path路由，可以配置 ignored-services；
+# 动态路由指与eureka集成的：lesson-6-sms-interface不对外开放接口，要想访问这个服务必须通过网关 zuul，发送get请求 http://localhost:8765/tony_api/lesson-6-sms-interface/sms 有返回值；路由是eureka中获取的，直接将 路径/lesson-6-sms-interface路由到 服务lesson-6-sms-interface；
 zuul:
   ignored-services: lesson-6-sms-interface
+```
 
-动态路由指与eureka集成的：lesson-6-sms-interface不对外开放接口，要想访问这个服务必须通过网关 zuul，发送get请求 http://localhost:8765/tony_api/lesson-6-sms-interface/sms
-有返回值；路由是eureka中获取的，直接将 路径/lesson-6-sms-interface路由到 服务lesson-6-sms-interface；
-
-③ribbon路由配置，在lesson-6-zuul-server.yml文件中；
+```yaml
+# ③ribbon路由配置，在lesson-6-zuul-server.yml文件中；
+# 测试Ribbon配置，访问zuul服务，发送get请求 http://localhost:8765/tony_api/service-by-ribbon
 zuul:
     route-service-by-ribbon:        # 路由key，将外部path 路由到 内部实例serviceId；路由key名称自己随便定义；
       path: /service-by-ribbon/**   # 外部path；
       serviceId: service-by-ribbon  # 内部服务；服务信息是通过ribbon负载均衡器配置的；
-service-by-ribbon服务配置，在lesson-6-zuul-server.yml文件中；
+# service-by-ribbon服务配置，在lesson-6-zuul-server.yml文件中；
 service-by-ribbon:                                                                          # 服务名称
   listOfServers: http://www.csdn.net,http://www.baidu.com,http://www.dongnaoedu.com         # 服务实例列表
   ribbon:
     NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule                        # 负载策略
     NIWSServerListClassName: com.netflix.loadbalancer.ConfigurationBasedServerList          # 设置它的服务实例信息来自配置文件, 而不是euereka
-测试Ribbon配置，访问zuul服务，发送get请求 http://localhost:8765/tony_api/service-by-ribbon
-
-3.动态刷新路由含义：动态 添加或者删除或者屏蔽 路由；
+```
 
 4.如何实现动态刷新路由方法：
 a eureka会自动维护；
@@ -77,11 +78,9 @@ b 配置文件中的静态路由，修改 config-server服务中或者远程仓�
 5.降级策略如何配置？
 ①集成eureka，zuul是使用 hystrix + ribbon来调用服务的；注意超时时间的配置，包括ribbon超时和hystrix超时，配置在 lesson-6-zuul-server.yml文件中；
 ②实现 ZuulFallbackProvider接口；
-# 注意项：
-# 1、zuul环境下，信号量模式下并发量的大小zuul.semaphore.maxSemaphores的优先级高于 hystrix信号量并发量大小；
-# 2、zuul环境下，资源隔离策略默认信号量zuul.ribbonIsolationStrategy的优先级高于 hystrix...；
-# 3、zuul环境下，分组 固定为RibbonCommand；
-# 4、zuul环境下，commandKey 对应每个服务的serviceId
+```yaml
+#当请求超时的时候，要对服务进行降级，见com.dongnaoedu.springcloud.zuul.DefaultFallbackProvider类，该类实现ZuulFallbackProvider接口；
+#测试 访问lesson-6-sms-interface服务的 TestController#timeOut()方法，即 http://localhost:8765/tony_api/lesson-6-sms-interface/hystrix/timeout，设置2s超时，该请求3s钟才会响应，因此当请求超过 2s时，会调用DefaultFallbackProvider类，返回降级结果；
 hystrix:
   command:
     default:                                    # 这是默认的配置
@@ -97,17 +96,16 @@ ribbon:
   OkToRetryOnAllOperations: true                # 是否开启重试
   MaxAutoRetriesNextServer: 1                   # 重试期间，实例切换次数
   MaxAutoRetries: 0                             # 当前实例重试次数
+```
 
-当请求超时的时候，要对服务进行降级，见com.dongnaoedu.springcloud.zuul.DefaultFallbackProvider类，该类实现ZuulFallbackProvider接口；
-测试：访问lesson-6-sms-interface服务的 TestController#timeOut()方法，即 http://localhost:8765/tony_api/lesson-6-sms-interface/hystrix/timeout，设置
-2s超时，该请求3s钟才会响应，因此当请求超过 2s时，会调用DefaultFallbackProvider类，返回降级结果；
----
+```text
 Zuul大部分功能都是通过过滤器来实现的。Zuul中定义了四种标准过滤器类型，这些过滤器类型对应于请求的典型生命周期。
 (1) PRE：这种过滤器在请求被路由之前调用。我们可利用这种过滤器实现身份验证、在集群中选择请求的微服务、记录调试信息等。
 (2) ROUTING：这种过滤器将请求路由到微服务。这种过滤器用于构建发送给微服务的请求，并使用Apache HttpClient或Netfilx Ribbon请求微服务。
 (3) POST：这种过滤器在路由到微服务以后执行。这种过滤器可用来为响应添加标准的HTTP Header、收集统计信息和指标、将响应从微服务发送给客户端等。
 (4) ERROR：在其他阶段发生错误时执行该过滤器。
----
+```
+```text
 SpringCloud网关zuul原理：
 路由结构：
 zuul:
@@ -120,20 +118,22 @@ zuul:
 2 路由定位器 RouteLocator：将外部path 与 路由表匹配，得到一个路由；
 3 zuulServlet：受理外部path；
 4 zuulFilter：使用路由定位器实现路由定位，发起代理请求，返回结果；
+```
+![zuul-流程](assert/zuul-流程.png)
 
----
-看图 zuul-流程.png：
 pre类型zuul filter 解析请求：在发起请求前 寻找路由，权限校验，自定义限流；route类型zuul filter 发送请求：会判断是调用普通 url，还是调用微服务，然后发起请求；
 如果没有异常，post类型zuul filter则返回结果，因为是反向代理，调用服务的是zuulServlet，最终要将结果返回给客户端；
----
-看图 zuul路由定位器、filter详解.png
+
+![zuul路由定位器_filter详解](assert/zuul路由定位器_filter详解.png)
+```text
 看代码小技巧：通过 exception的堆栈信息来看代码调用链接（视频没演示），最终使用 debug打断点的形式讲解的 ；
 在 ZuulServlet类的 service()方法上面 打断点，发送请求 http://localhost:8765/tony_api/oschina/ 到网关zuul，会停在断点，在debugger上面会出现所有方法的调用链；
 调用链中发现 ZuulController；
 要想知道ZuulServlet从哪里来的，就要找它的被调用处，查找被调用处快捷键 ctr + 左键；结果发现 ZuulServlet类在ZuulConfiguration类中被调用，再继续找
 ZuulConfiguration在哪里被调用，即从哪里来，ctr + 左键；结果发现 EnableZuulServer注解上使用了@Import(ZuulConfiguration.class)，表示将 ZuulCongiguration
 导入到 IOC容器；即在启动类使用@EnableZuulProxy激活代理时，会导入一系列 filter相关的实例bean；
-************************************************************************************************************************************************
+```
+```text
 1、@Import(A.class)作用：当用到A实例bean时，再将其导入到 IOC容器；
 2、@Import的三种使用方式：
 通过查看@Import源码可以发现@Import注解只能注解在类上，以及唯一的参数value上可以配置3种类型的值Configuration，ImportSelector，ImportBeanDefinitionRegistrar
@@ -169,48 +169,54 @@ bean名称为===mainConfig
 bean名称为===com.zhang.bean.Square
 bean名称为===com.zhang.bean.Circular
 bean名称为===com.zhang.bean.Triangle
-************************************************************************************************************************************************
+```
+
+```text
 ZuulConfiguration，但是代码中没有引入EnableZuulServer注解，而是在启动类上引入了@EnableZuulProxy，跟@EnableZuulProxy，发现引入了@Import(ZuulProxyConfiguration.class)
 ZuulProxyConfiguration，ZuulProxyConfiguration继承了 ZuulConfiguration，当使用@EnableZuulProxy注解时，ZuulConfiguration就生效了，会加载ZuulProxyConfiguration
 里面的配置，这些配置做了哪些事情呢？1 实例化了一个ZuulController
 @Bean
 public ZuulController zuulController() {return new ZuulController();}
 
-.factory是入口，注解是入口；
+Spring.factories是入口，注解是入口；
 跟 ZuulServlet类的 service()方法，如下：
+```
+```java
+public class ZuulServlet{
 @Override
-public void service(javax.servlet.ServletRequest servletRequest, javax.servlet.ServletResponse servletResponse) throws ServletException, IOException {
-    try {
-        init((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse);
-        RequestContext context = RequestContext.getCurrentContext();
-        context.setZuulEngineRan();
+    public void service(javax.servlet.ServletRequest servletRequest, javax.servlet.ServletResponse servletResponse) throws ServletException, IOException {
         try {
-            preRoute();     //运行 pre类型的zuulfilter，解析请求，路由 → 微服务；@EnableZuulProxy会加载所有zuulFilter；
-        } catch (ZuulException e) {
-            error(e);     //对应 error类型的 zuulfilter
-            postRoute();
-            return;
+            init((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse);
+            RequestContext context = RequestContext.getCurrentContext();
+            context.setZuulEngineRan();
+            try {
+                preRoute();     //运行 pre类型的zuulfilter，解析请求，路由 → 微服务；@EnableZuulProxy会加载所有zuulFilter；
+            } catch (ZuulException e) {
+                error(e);     //对应 error类型的 zuulfilter
+                postRoute();
+                return;
+            }
+            try {
+                route();     //对应 route类型的 zuulfilter，发起请求，路由 → 微服务；
+            } catch (ZuulException e) {
+                error(e);
+                postRoute();
+                return;
+            }
+            try {
+                postRoute();     //对应 post类型的 zuulfilter，发送响应，响应客户端；
+            } catch (ZuulException e) {
+                error(e);
+                return;
+            }
+        } catch (Throwable e) {
+            error(new ZuulException(e, 500, "UNHANDLED_EXCEPTION_" + e.getClass().getName()));
+        } finally {
+            RequestContext.getCurrentContext().unset();
         }
-        try {
-            route();     //对应 route类型的 zuulfilter，发起请求，路由 → 微服务；
-        } catch (ZuulException e) {
-            error(e);
-            postRoute();
-            return;
-        }
-        try {
-            postRoute();     //对应 post类型的 zuulfilter，发送响应，响应客户端；
-        } catch (ZuulException e) {
-            error(e);
-            return;
-        }
-    } catch (Throwable e) {
-        error(new ZuulException(e, 500, "UNHANDLED_EXCEPTION_" + e.getClass().getName()));
-    } finally {
-        RequestContext.getCurrentContext().unset();
     }
 }
----
+```
 filter加载过程：
 跟其中的preRoute()，该方法要获取所有filter，并执行各种类型的filter，那么filter哪里来的呢？看图 zuul路由定位器、filter详解.png； 了解 filter加载流程：
 从 ZuulServlet的入口ZuulConfiguration（入口即调用处）和ZuulConfiguration的子类ZuulProxyConfiguration 找，可以发现ZuulProxyConfiguration中实例化了多个
