@@ -69,15 +69,61 @@ service-by-ribbon:                                                              
     NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule                        # 负载策略
     NIWSServerListClassName: com.netflix.loadbalancer.ConfigurationBasedServerList          # 设置它的服务实例信息来自配置文件, 而不是euereka
 ```
-
-4.如何实现动态刷新路由方法：
+```text
+Zuul路由 动态刷新：
 a eureka会自动维护；
 b 配置文件中的静态路由，修改 config-server服务中或者远程仓库中 lesson-6-zuul-server.yml文件中路由设置，然后发送post请求http://localhost:8765/refresh，其
 中8765为lesson-6-zuul-server服务的端口，访问lesson-6-zuul-server服务的 /refresh端点，可以动态更新配置，不需要重启lesson-6-zuul-server服务；
-
-5.降级策略如何配置？
-①集成eureka，zuul是使用 hystrix + ribbon来调用服务的；注意超时时间的配置，包括ribbon超时和hystrix超时，配置在 lesson-6-zuul-server.yml文件中；
-②实现 ZuulFallbackProvider接口；
+```
+```text
+Zuul网关 hystrix降级策略 的配置：
+1、Zuul默认集成 hystrix + ribbon，并 依赖eureka 对服务进行调用；注意超时时间的配置，包括ribbon超时和hystrix超时，配置在 lesson-6-zuul-server.yml文件中；
+2、实现 ZuulFallbackProvider接口，为网关请求 提供降级方法；
+```
+```java
+/**网关Zuul默认 hystrix降级类
+* 测试：http://localhost:8765/tony_api/lesson-6-sms-interface/hystrix/timeout，请求超时调用降级方法 fallbackResponse()
+* */
+@Component
+public class DefaultFallbackProvider implements ZuulFallbackProvider{
+	@Override
+	public String getRoute() {
+		return "*";         // *表示为所有 网关请求 提供降级方法，a表示只为 请求服务a的网关请求 提供降级方法
+	}
+	/**请求路由发生错误时，给请求的响应信息*/
+	@Override
+	public ClientHttpResponse fallbackResponse() {
+		return new ClientHttpResponse() {
+			
+			@Override
+			public HttpHeaders getHeaders() {
+				HttpHeaders headers = new HttpHeaders();                                //设置 返回头信息
+                return headers;
+			}
+			
+			@Override
+			public InputStream getBody() throws IOException {
+				return new ByteArrayInputStream("hystrix发现有问题啦".getBytes());        //设置 返回内容
+			}
+			
+			@Override
+			public String getStatusText() throws IOException {
+				return "服务有问题啦";
+			}
+			
+			@Override
+			public HttpStatus getStatusCode() throws IOException {
+				return HttpStatus.BAD_GATEWAY;                                          // 设置 返回码
+			}
+			
+			@Override
+			public int getRawStatusCode() throws IOException {
+				return 502;
+			}
+		};
+	}
+}
+```
 ```yaml
 #当请求超时的时候，要对服务进行降级，见com.dongnaoedu.springcloud.zuul.DefaultFallbackProvider类，该类实现ZuulFallbackProvider接口；
 #测试 访问lesson-6-sms-interface服务的 TestController#timeOut()方法，即 http://localhost:8765/tony_api/lesson-6-sms-interface/hystrix/timeout，设置2s超时，该请求3s钟才会响应，因此当请求超过 2s时，会调用DefaultFallbackProvider类，返回降级结果；
@@ -99,12 +145,20 @@ ribbon:
 ```
 
 ```text
-Zuul大部分功能都是通过过滤器来实现的。Zuul中定义了四种标准过滤器类型，这些过滤器类型对应于请求的典型生命周期。
-(1) PRE：这种过滤器在请求被路由之前调用。我们可利用这种过滤器实现身份验证、在集群中选择请求的微服务、记录调试信息等。
-(2) ROUTING：这种过滤器将请求路由到微服务。这种过滤器用于构建发送给微服务的请求，并使用Apache HttpClient或Netfilx Ribbon请求微服务。
-(3) POST：这种过滤器在路由到微服务以后执行。这种过滤器可用来为响应添加标准的HTTP Header、收集统计信息和指标、将响应从微服务发送给客户端等。
-(4) ERROR：在其他阶段发生错误时执行该过滤器。
+Zuul执行流程：
+DispatcherServlet#doDispatch() → DispatcherServlet#getHandler() → AbstractHandlerMapping#getHandler() → AbstractUrlHandlerMapping#getHandlerInternal() → ZuulHandlerMapping#lookupHandler() → 
+AbstractUrlHandlerMapping#lookupHandler()，至此 找到了 handler，所有外部 path都映射到同一个 handler即ZuulController；
+ZuulController#handleRequest() → ServletWrappingController#handleRequestInternal() → ZuulServlet#service()，所有外部 path都映射到同一个Servlet 即 ZuulServlet
+1、ZuulServlet.service() 受理所有 网关请求path，service()方法里 调用4个方法 preRoute() route() postRoute() error(e)；
+2、preRoute()：调用所有 pre类型的 ZuulFilter的runFilter()方法，这些方法主要负责 寻找路由，权限校验，限流；
+3、route()：调用所有 route类型的 ZuulFilter的runFilter()方法，这个方法负责 根据外部path 调用内部 相应服务；
+4、postRoute()：调用所有 post类型的 ZuulFilter的runFilter()方法，这些方法主要负责 处理 Response；
+5、error()：调用所有 error类型的 ZuulFilter的runFilter()方法，这些方法主要负责 返回异常；
+注意：以上各种类型的 ZuulFilter怎么来的？启动SpringBoot时，会自动装配到 当前项目的 IOC容器中；
+注意：实现 Controller接口 与使用 @Controller作用相同，ZuulController就实现了Contrller接口，但是Controller接口不推荐使用；
 ```
+![zuul-流程](assert/zuul-流程.png)
+
 ```text
 SpringCloud网关zuul原理：
 路由结构：
@@ -119,10 +173,7 @@ zuul:
 3 zuulServlet：受理外部path；
 4 zuulFilter：使用路由定位器实现路由定位，发起代理请求，返回结果；
 ```
-![zuul-流程](assert/zuul-流程.png)
 
-pre类型zuul filter 解析请求：在发起请求前 寻找路由，权限校验，自定义限流；route类型zuul filter 发送请求：会判断是调用普通 url，还是调用微服务，然后发起请求；
-如果没有异常，post类型zuul filter则返回结果，因为是反向代理，调用服务的是zuulServlet，最终要将结果返回给客户端；
 
 ![zuul路由定位器_filter详解](assert/zuul路由定位器_filter详解.png)
 ```text
