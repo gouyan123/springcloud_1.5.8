@@ -148,7 +148,7 @@ ribbon:
 Zuul执行流程：
 DispatcherServlet#doDispatch() → DispatcherServlet#getHandler() → AbstractHandlerMapping#getHandler() → AbstractUrlHandlerMapping#getHandlerInternal() → ZuulHandlerMapping#lookupHandler() → 
 AbstractUrlHandlerMapping#lookupHandler()，至此 找到了 handler，所有外部 path都映射到同一个 handler即ZuulController；
-ZuulController#handleRequest() → ServletWrappingController#handleRequestInternal() → ZuulServlet#service()，所有外部 path都映射到同一个Servlet 即 ZuulServlet
+ZuulController#handleRequest() → ServletWrappingController#handleRequestInternal() → ZuulServlet#service()，ZuulController将请求(req,resp)交给 ZuulServlet.service(req,resp)处理；
 1、ZuulServlet.service() 受理所有 网关请求path，service()方法里 调用4个方法 preRoute() route() postRoute() error(e)；
 2、preRoute()：调用所有 pre类型的 ZuulFilter的runFilter()方法，这些方法主要负责 寻找路由，权限校验，限流；
 3、route()：调用所有 route类型的 ZuulFilter的runFilter()方法，这个方法负责 根据外部path 调用内部 相应服务；
@@ -174,15 +174,11 @@ zuul:
 4 zuulFilter：使用路由定位器实现路由定位，发起代理请求，返回结果；
 ```
 
-
-![zuul路由定位器_filter详解](assert/zuul路由定位器_filter详解.png)
 ```text
-看代码小技巧：通过 exception的堆栈信息来看代码调用链接（视频没演示），最终使用 debug打断点的形式讲解的 ；
-在 ZuulServlet类的 service()方法上面 打断点，发送请求 http://localhost:8765/tony_api/oschina/ 到网关zuul，会停在断点，在debugger上面会出现所有方法的调用链；
-调用链中发现 ZuulController；
-要想知道ZuulServlet从哪里来的，就要找它的被调用处，查找被调用处快捷键 ctr + 左键；结果发现 ZuulServlet类在ZuulConfiguration类中被调用，再继续找
-ZuulConfiguration在哪里被调用，即从哪里来，ctr + 左键；结果发现 EnableZuulServer注解上使用了@Import(ZuulConfiguration.class)，表示将 ZuulCongiguration
-导入到 IOC容器；即在启动类使用@EnableZuulProxy激活代理时，会导入一系列 filter相关的实例bean；
+看代码小技巧：
+1、通过exception的堆栈信息来看代码调用链接；
+2、debug打断点 看代码调用链接；
+3、Find Usags 查看 被哪里使用；
 ```
 ```text
 1、@Import(A.class)作用：当用到A实例bean时，再将其导入到 IOC容器；
@@ -221,141 +217,84 @@ bean名称为===com.zhang.bean.Square
 bean名称为===com.zhang.bean.Circular
 bean名称为===com.zhang.bean.Triangle
 ```
-
 ```text
-ZuulConfiguration，但是代码中没有引入EnableZuulServer注解，而是在启动类上引入了@EnableZuulProxy，跟@EnableZuulProxy，发现引入了@Import(ZuulProxyConfiguration.class)
-ZuulProxyConfiguration，ZuulProxyConfiguration继承了 ZuulConfiguration，当使用@EnableZuulProxy注解时，ZuulConfiguration就生效了，会加载ZuulProxyConfiguration
-里面的配置，这些配置做了哪些事情呢？1 实例化了一个ZuulController
-@Bean
-public ZuulController zuulController() {return new ZuulController();}
+Filter 加载，执行流程：
+```
+![zuul路由定位器_filter详解](assert/zuul路由定位器_filter详解.png)
+```java
+/**Filter加载过程：@EnableZuulProxy表示自动装配 Zuul包中的类 到当前IOC容器*/
+@SpringBootApplication
+@EnableZuulProxy
+public class ZuulApplication {
+    //...
+}
 
-Spring.factories是入口，注解是入口；
-跟 ZuulServlet类的 service()方法，如下：
+@EnableCircuitBreaker
+@EnableDiscoveryClient
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Import(ZuulProxyConfiguration.class)   //跟ZuulProxyConfiguration；@Import表示将ZuulProxyConfiguration导入 IOC容器；
+public @interface EnableZuulProxy {
+}
+
+@Configuration
+public class ZuulProxyConfiguration extends ZuulConfiguration {}    //ZuulProxyConfiguration实例化之前，必须先实例化其父类ZuulConfiguration，跟ZuulConfiguration
+
+@Configuration
+@EnableConfigurationProperties({ ZuulProperties.class })
+@ConditionalOnClass(ZuulServlet.class)
+@Import(ServerPropertiesAutoConfiguration.class)
+public class ZuulConfiguration {
+    @Bean
+    public ZuulController zuulController() {
+        return new ZuulController();                        //ZuulController 实现Controller接口，DispatcherServlet寻找Controller类作为 handler，就会找到这个ZuulController
+    }
+    @Bean
+    public ServletDetectionFilter servletDetectionFilter() {
+        return new ServletDetectionFilter();                //装配 各种Filter到 当前IOC容器
+    }
+}
+//看完父类 ZuulProxyConfiguration，再看自己 ZuulProxyConfiguration
+@Configuration
+public class ZuulProxyConfiguration extends ZuulConfiguration {
+    @Bean
+    public PreDecorationFilter preDecorationFilter(RouteLocator routeLocator, ProxyRequestHelper proxyRequestHelper) {      //装配 各种类型Filter到 IOC容器
+        return new PreDecorationFilter(routeLocator, this.server.getServletPrefix(), this.zuulProperties,proxyRequestHelper);
+    }
+}
 ```
 ```java
+/**Filter执行过程*/
 public class ZuulServlet{
-@Override
+    @Override
     public void service(javax.servlet.ServletRequest servletRequest, javax.servlet.ServletResponse servletResponse) throws ServletException, IOException {
-        try {
-            init((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse);
-            RequestContext context = RequestContext.getCurrentContext();
-            context.setZuulEngineRan();
-            try {
-                preRoute();     //运行 pre类型的zuulfilter，解析请求，路由 → 微服务；@EnableZuulProxy会加载所有zuulFilter；
-            } catch (ZuulException e) {
-                error(e);     //对应 error类型的 zuulfilter
-                postRoute();
-                return;
+        preRoute();     //跟；从IOC容器中获取 所有 pre类型的 ZuulFilter，然后触发其过滤方法 ZuulFilter#runFilter()
+        route();     
+        postRoute();     
+        error();
+    }
+    void preRoute() throws ZuulException {
+        zuulRunner.preRoute();     //跟 
+    }
+}
+public class FilterProcessor {
+    public Object runFilters(String sType) throws Throwable {
+        boolean bResult = false;
+        List<ZuulFilter> list = FilterLoader.getInstance().getFiltersByType(sType);     //从IOC容器中 获取所有 pre 类型的 ZuulFilter
+        if (list != null) {
+            for (int i = 0; i < list.size(); i++) {
+                ZuulFilter zuulFilter = list.get(i);
+                Object result = processZuulFilter(zuulFilter);                          //zuulFilter.runFilter() 触发zuulFilter
+                if (result != null && result instanceof Boolean) {
+                    bResult |= ((Boolean) result);
+                }
             }
-            try {
-                route();     //对应 route类型的 zuulfilter，发起请求，路由 → 微服务；
-            } catch (ZuulException e) {
-                error(e);
-                postRoute();
-                return;
-            }
-            try {
-                postRoute();     //对应 post类型的 zuulfilter，发送响应，响应客户端；
-            } catch (ZuulException e) {
-                error(e);
-                return;
-            }
-        } catch (Throwable e) {
-            error(new ZuulException(e, 500, "UNHANDLED_EXCEPTION_" + e.getClass().getName()));
-        } finally {
-            RequestContext.getCurrentContext().unset();
         }
+        return bResult;
     }
 }
 ```
-filter加载过程：
-跟其中的preRoute()，该方法要获取所有filter，并执行各种类型的filter，那么filter哪里来的呢？看图 zuul路由定位器、filter详解.png； 了解 filter加载流程：
-从 ZuulServlet的入口ZuulConfiguration（入口即调用处）和ZuulConfiguration的子类ZuulProxyConfiguration 找，可以发现ZuulProxyConfiguration中实例化了多个
-filter，如下：
-@Bean
-public PreDecorationFilter preDecorationFilter(RouteLocator routeLocator, ProxyRequestHelper proxyRequestHelper) {... return new Filter()}
-@Bean
-public RibbonRoutingFilter ribbonRoutingFilter(ProxyRequestHelper helper,RibbonCommandFactory<?> ribbonCommandFactory) {... return new Filter()}
-跟ZuulServlet类中 preRoute()方法到 runFilters(String sType)方法中的 List<ZuulFilter> list = FilterLoader.getInstance().getFiltersByType(sType);
-跟 getFiltersByType(sType)方法，该方法从所有zuulFilter中获取 pre类型，route类型，post类型的zuulFilter，部分代码如下：
-Collection<ZuulFilter> filters = filterRegistry.getAllFilters();
-for (Iterator<ZuulFilter> iterator = filters.iterator(); iterator.hasNext(); ) {
-    ZuulFilter filter = iterator.next();
-    if (filter.filterType().equals(filterType)) {
-        list.add(filter);
-    }
-}
-发现所有 filter都注册到 filterRegistry中了(FilterRegistry filterRegistry = FilterRegistry.instance())；那么 filter什么时候注册进filterRegistry的呢？
-在初始化的时候，通过 ZuulFilterInitializer注册进去的；ZuulConfiguration中实例化 zuulFilterInitializer代码如下：
-@Configuration
-protected static class ZuulFilterConfiguration {
-    @Autowired
-    private Map<String, ZuulFilter> filters;
-    @Bean
-    public ZuulFilterInitializer zuulFilterInitializer(CounterFactory counterFactory, TracerFactory tracerFactory) {
-        FilterLoader filterLoader = FilterLoader.getInstance();
-        FilterRegistry filterRegistry = FilterRegistry.instance();
-        return new ZuulFilterInitializer(this.filters, counterFactory, tracerFactory, filterLoader, filterRegistry);
-    }
-}
-@Autowired
-private Map<String, ZuulFilter> filters; 注入所有 filter；new ZuulFilterInitializer()往 filterRegistry里面不断注册新的东西，代码如下：
-@Override
-public void contextInitialized(ServletContextEvent sce) {
-    TracerFactory.initialize(tracerFactory);
-    CounterFactory.initialize(counterFactory);
-    for (Map.Entry<String, ZuulFilter> entry : this.filters.entrySet()) {
-        filterRegistry.put(entry.getKey(), entry.getValue());       // 注册
-    }
-}
----
-filter执行过程
-看图 zuul路由定位器、filter详解.png；
-filter执行器 FilterProcessor按类型执行filter runFilters(String sType)方法如下：
-public Object runFilters(String sType) throws Throwable {
-    if (RequestContext.getCurrentContext().debugRouting()) {
-        Debug.addRoutingDebug("Invoking {" + sType + "} type filters");
-    }
-    boolean bResult = false;
-    List<ZuulFilter> list = FilterLoader.getInstance().getFiltersByType(sType);
-    if (list != null) {
-        for (int i = 0; i < list.size(); i++) {
-            ZuulFilter zuulFilter = list.get(i);
-            Object result = processZuulFilter(zuulFilter);
-            if (result != null && result instanceof Boolean) {
-                bResult |= ((Boolean) result);
-            }
-        }
-    }
-    return bResult;
-}
-getFiltersByType(sType)方法，根据类型获取 filter并对filter进行排序；
-processZuulFilter(zuulFilter);所有filter使用processZuulFilter()这个执行器；跟processZuulFilter()，里面filter.runFilter();表示判断filter是否执行；
-runFilter()代码如下：
-public ZuulFilterResult runFilter() {
-    ZuulFilterResult zr = new ZuulFilterResult();
-    if (!isFilterDisabled()) {              // 判断 外部配置文件 是否关闭了该zuulFilter；
-        if (shouldFilter()) {               // 根据每个zuulFilter子类实现，来判断是否执行；
-            Tracer t = TracerFactory.instance().startMicroTracer("ZUUL::" + this.getClass().getSimpleName());
-            try {
-                Object res = run();         // 每个 zuulFilter的实现来实现这个 run()
-                zr = new ZuulFilterResult(res, ExecutionStatus.SUCCESS);
-            } catch (Throwable e) {
-                t.setName("ZUUL::" + this.getClass().getSimpleName() + " failed");
-                zr = new ZuulFilterResult(ExecutionStatus.FAILED);
-                zr.setException(e);
-            } finally {
-                t.stopAndLog();
-            }
-        } else {
-            zr = new ZuulFilterResult(ExecutionStatus.SKIPPED);
-        }
-    }
-    return zr;
-}
-if (!isFilterDisabled())判断filter在配置文件中是否被关闭；if (shouldFilter())判断filter是否需要执行，根据当前上下文；Object res = run();通过run()方法执行
-filter，run()方法是一个接口方法，由每个filter的实现类来做的；
----
+
 路由定位流程：
 所有请求过来后，都要经过路由定位 PreDecorationFilter，跟进去，在shouldFilter()和run()方法中设置 断点，发送get请求 http://localhost:8765/tony_api/oschina/
 到网关zuul，shouldFilter()方法用于判断这个filter是否需要执行，如果需要执行这个 filter就调用 run()方法，否则不调用run()方法；所有filter类都要继承ZuulFilter
@@ -613,3 +552,7 @@ public Object run() {
     // 示例：uaaclaim中有一个scope数组值为[oschia,lession-6-sms-interface],那么就代表这个token只能用于这两个路由的访问
     return null;
 }
+```text
+扩展了解：
+Context上下文：Context就是一个 容器，存放 公共资源，要用公共资源的时候 就访问 Context；
+```
