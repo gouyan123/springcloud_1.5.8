@@ -36,7 +36,7 @@ public class DefaultFallbackProvider implements ZuulFallbackProvider{
 			public InputStream getBody() throws IOException {
 				return new ByteArrayInputStream("hystrix发现有问题啦".getBytes());
 			}
-			
+
 			@Override
 			public String getStatusText() throws IOException {
 				return "服务有问题啦";
@@ -46,15 +46,15 @@ public class DefaultFallbackProvider implements ZuulFallbackProvider{
 			public HttpStatus getStatusCode() throws IOException {
 				return HttpStatus.BAD_GATEWAY;
 			}
-			
+
 			@Override
 			public int getRawStatusCode() throws IOException {
 				return 502;
 			}
-			
+
 			@Override
 			public void close() {
-				
+
 			}
 		};
 	}

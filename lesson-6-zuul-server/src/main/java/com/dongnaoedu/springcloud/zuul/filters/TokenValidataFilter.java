@@ -36,8 +36,7 @@ public class TokenValidataFilter extends ZuulFilter {
 	public boolean shouldFilter() {
 		new Exception().printStackTrace();
 		RequestContext ctx = RequestContext.getCurrentContext();
-		// 根据routeId，过滤掉不需要做权限校验的请求
-		return !tonyConfigurationBean.getNoAuthenticationRoutes().contains(ctx.get("proxy"));
+		return !tonyConfigurationBean.getNoAuthenticationRoutes().contains(ctx.get("proxy"));	// ctx.get("proxy")表示 获取代理的 路由key，此处为 uaa-token
 	}
 
 	@Override
@@ -53,7 +52,7 @@ public class TokenValidataFilter extends ZuulFilter {
 			return null;
 		}
 		// 检验token是否正确；jwt：json web token
-		// 这里只是通过使用key对token进行解码是否成功，并没有对有效期、已经token里面的内容进行校验。
+		// 这里只是通过使用key对token进行解码是否成功，并没有对有效期、以及token里面的内容进行校验。
 		Claims claims = jwtTokenProvider.parseToken(token);
 		if (claims == null) {
 			forbidden();	
